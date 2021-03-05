@@ -37,7 +37,7 @@ using namespace gl;
 #endif
 
 // Main code
-int main(int, char**) {
+int main(int argc, char** argv) {
     // Setup SDL
     // (Some versions of SDL before <2.0.10 appears to have performance/stalling issues on a minority of Windows systems,
     // depending on whether SDL_INIT_GAMECONTROLLER is enabled or disabled.. updating to latest version of SDL is recommended!)
@@ -90,11 +90,11 @@ int main(int, char**) {
     bool err = false;
     glbinding::initialize([](const char* name) { return (glbinding::ProcAddress)SDL_GL_GetProcAddress(name); });
 #else
-    bool err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
+    bool err = false; // I1f you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
 #endif
-    if (err) {
+    if (!err) {
         fprintf(stderr, "Failed to initialize OpenGL loader!\n");
-        return 1;
+        return err;
     }
 
     // Setup Dear ImGui context
