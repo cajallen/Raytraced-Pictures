@@ -115,13 +115,13 @@
     <ClCompile Include="src\lib\glad\glad.c" />
     <ClCompile Include="src\lib\imgui-1.81\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\backends\imgui_impl_sdl.cpp" />
-    <ClCompile Include="src\lib\imgui-1.81\examples\example_sdl_opengl3\main.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui_demo.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui_draw.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui_tables.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui_widgets.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\misc\cpp\imgui_stdlib.cpp" />
+    <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lib\geom_lib\geom_lib_2d.h" />
