@@ -98,5 +98,8 @@
     <ClInclude Include="src\lib\imgui-1.81\misc\single_file\imgui_single_file.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
