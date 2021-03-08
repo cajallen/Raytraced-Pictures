@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "image_lib.h"
 #include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <stdio.h>
