@@ -37,29 +37,33 @@ struct P3Material {
 
     int id = 0;
 
+    // No old_id is needed, as we don't ever "replace" materials (non-polymorphic).
     P3Material();
-    P3Material(string s);
 
     void ImGui();
-    string String();
+    string Encode();
+    void Decode(string s);
     string with_id(string s);
 };
 
 // This only needs to exist in preperation for other Geometry primitives.
 struct P3Geometry {
     int id;
-    P3Material mat;
+    P3Material* mat;
 
     // Call without index to create new shapes
     P3Geometry();
     // Call with index to replace shapes (use old id)
     P3Geometry(int old_id);
+
     virtual void ImGui();
-    virtual const string Name();
+    virtual string Encode();
+    virtual void Decode(string s);
+
+    string with_id(string s);
     vector<P3Geometry*>::iterator GetIter();
     void Delete();
 
-    string with_id(string s);
 
     bool operator==(P3Geometry rhs) { return id == rhs.id; }
 };
@@ -74,47 +78,75 @@ struct P3Sphere : P3Geometry {
     // Call with index to replace shapes (use old id)
     P3Sphere(int old_id) : P3Geometry(old_id) {}
 
-    const string Name();
     void ImGui();
+    string Encode();
+    void Decode(string s);
 };
 
 
-struct P3AmbientLight {
+struct P3Light {
     float col[3] = { 0.0f, 0.0f, 0.0f };
     int id = 0;
 
-    P3AmbientLight();
-    P3AmbientLight(int old_id) { }
+    P3Light();
+    P3Light(int old_id);
 
     virtual void ImGui();
-    virtual string String() { return ""; }
-    virtual string with_id(string s);
+    virtual string Encode();
+    virtual void Decode(string s);
+    vector<P3Light*>::iterator GetIter();
+    void Delete();
+
+    string with_id(string s);
 };
 
-struct P3Light : P3AmbientLight {
-    float pos[3];
 
-    virtual void ImGui() { }
-    virtual string String() { return ""; }
-    virtual string with_id(string s) { return ""; }
+struct P3AmbientLight : P3Light {
+    P3AmbientLight() : P3Light() {}
+    P3AmbientLight(int old_id) : P3Light(old_id) {}
+
+    void ImGui();
+    string Encode();
+    void Decode(string s);
 };
 
-struct P3SpotLight : P3Light {
-    float dir[3];
-    float angle1;
-    float angle2;
+struct P3PointLight : P3Light {
+    float pos[3] = { 0.0f, 0.0f, 0.0f };
 
-    void ImGui() { }
-    string String() { return ""; }
-    string with_id(string s) { return ""; }
+    P3PointLight() : P3Light() {}
+    P3PointLight(int old_id) : P3Light(old_id) {}
+
+    void ImGui();
+    string Encode();
+    void Decode(string s);
 };
 
 struct P3DirectionalLight : P3Light {
-    void ImGui() { }
-    string String() { return ""; }
-    string with_id(string s) { return ""; }
+    float dir[3] = { 0.0f, 0.0f, 0.0f };
+
+    P3DirectionalLight() : P3Light() {}
+    P3DirectionalLight(int old_id) : P3Light(old_id) {}
+
+    void ImGui();
+    string Encode();
+    void Decode(string s);
+};
+
+struct P3SpotLight : P3Light {
+    float pos[3] = { 0.0f, 0.0f, 0.0f };
+    float dir[3] = { 0.0f, 0.0f, 0.0f };
+    float angle1 = 0.0f;
+    float angle2 = 0.0f;
+
+    P3SpotLight() : P3Light() {}
+    P3SpotLight(int old_id) : P3Light(old_id) {}
+
+    void ImGui();
+    string Encode();
+    void Decode(string s);
 };
 
 void Reset();
 void Load();
+void Save();
 void Render();
