@@ -47,16 +47,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\lib\geom_lib\geom_lib_2d.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\lib\geom_lib\multivector.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\lib\geom_lib\pga.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\lib\geom_lib\primitives.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\glad\glad.h">
@@ -357,6 +348,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\SDL2-2.0.14\include\SDL_vulkan.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\image_lib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\stb_image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\stb_image_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\geom_lib\PGA_3D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

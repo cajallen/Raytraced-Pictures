@@ -1,5 +1,10 @@
 // Main templated from Dear ImGui
 
+//#define _USE_MATH_DEFINES
+#include <stdint.h>
+#define STB_IMAGE_IMPLEMENTATION //only place once in one .cpp file
+#define STB_IMAGE_WRITE_IMPLEMENTATION //only place once in one .cpp files
+#include "image_lib.h"
 #include "main.h"
 
 // GLOBAL STATE
@@ -473,8 +478,36 @@ void Save() {
     scene_file.close();
 }
 
-void Render() {
 
+void Render() {
+    Point3D eye = Point3D(cp[0], cp[1], cp[2]);
+    Dir3D forward = Dir3D(cf[0], cf[1], cf[2]).normalized();
+    Dir3D up = Dir3D(cu[0], cu[1], cu[2]);
+    Dir3D right = cross(up, forward).normalized();
+    up = cross(forward, up).normalized();
+
+    int imgW = window_res[0];
+    int imgH = window_res[1];
+    float halfW = imgW / 2.0, halfH = imgH / 2.0;
+    float d = halfH / tanf(fov_ha * (M_PI / 180.0f));
+
+    Image outputImg = Image(imgW, imgH);
+    for (int i = 0; i < imgW; i++) {
+        for (int j = 0; j < imgH; j++) {
+            //TODO: In what way does this assumes the basis is orthonormal?
+            float u = (halfW - (window_res[0]) * ((i + 0.5) / imgW));
+            float v = (halfH - (window_res[1]) * ((j + 0.5) / imgH));
+            Point3D p = eye - d * forward + u * right + v * up;
+            Dir3D rayDir = (p - eye);
+            Line3D rayLine = vee(eye, rayDir).normalized();
+            // intersection = FindIntersection(eye, rayLine, scene);
+            // diff = intersection - sphere_center
+            // sphere_normal = diff.normalized()
+            //outputImg.setPixel(i, j, color);
+        }
+    }
+
+    outputImg.write(output_name);
 }
 
 
@@ -609,6 +642,18 @@ int main(int argc, char** argv) {
         ImGui::PopStyleColor();
 
 
+        ImGui::Begin("Output");
+        int im_h = 0, im_w = 0;
+        GLuint im_tex = 0;
+
+        bool ret = LoadTextureFromFile("smile.png", &im_tex, &im_w, &im_h);
+        IM_ASSERT(ret);
+
+        ImGui::Image((void*)(intptr_t)im_tex, ImVec2(im_w, im_h));
+        ImGui::End();
+
+
+
         ImGui::End();
 
         // Rendering
@@ -643,4 +688,39 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     return 0;
+}
+
+
+// From Dear ImGui wiki
+bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height) {
+    // Load from file
+    int image_width = 0;
+    int image_height = 0;
+    unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
+    if (image_data == NULL)
+        return false;
+
+    // Create a OpenGL texture identifier
+    GLuint image_texture;
+    glGenTextures(1, &image_texture);
+    glBindTexture(GL_TEXTURE_2D, image_texture);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+    // Upload pixels into texture
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+    stbi_image_free(image_data);
+
+    *out_texture = image_texture;
+    *out_width = image_width;
+    *out_height = image_height;
+
+    return true;
 }

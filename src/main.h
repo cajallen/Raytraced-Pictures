@@ -1,7 +1,7 @@
 #pragma once
 
 #include "imgui.h"
-#include "image_lib.h"
+#include "PGA_3D.h"
 #include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <stdio.h>
@@ -152,3 +152,5 @@ void Reset();
 void Load();
 void Save();
 void Render();
+
+bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
