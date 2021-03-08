@@ -18,6 +18,7 @@ using std::vector;
 using std::cout;
 using std::endl;
 using std::ifstream;
+using std::ofstream;
 using std::stringstream;
 
 #include <glad/glad.h>          // Initialize with gladLoadGL()

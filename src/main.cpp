@@ -8,18 +8,19 @@ vector<P3Light*> lights{};
 // We need to keep a vector of materials to free them.
 vector<P3Material*> materials{ new P3Material() };
 int entity_count = 0;
-char scene_name[128] = "";
+char scene_name[256] = "";
 
 // CAMERA SETTINGS
 float cp[3]{ 0.0f, 0.0f, 0.0f };
 float cf[3]{ 0.0f, 0.0f, 1.0f };
 float cu[3]{ 0.0f, 1.0f, 0.0f };
+float bc[3]{ 0.0f, 0.0f, 0.0f };
 float fov_ha = 45.0f;
 int window_res[2]{ 640, 480 };
 
 // OTHER SETTINGS
 int max_depth = 5;
-char output_name[128] = "";
+char output_name[256] = "raytraced.bmp";
 
 
 string rest_if_prefix(const string prefix, string content) {
@@ -124,6 +125,7 @@ void P3Sphere::ImGui() {
 
 
 void P3Material::ImGui() {
+    // TODO: "Make Unique" button
     if (ImGui::CollapsingHeader(with_id("Material ").c_str())) {
         ImGui::Indent(4.0f);
         ImGui::SliderFloat3(with_id("ambient##").c_str(), ambient, 0.0f, 1.0f);
@@ -243,7 +245,7 @@ void P3SpotLight::Decode(string s) {
 
 
 string P3Material::Encode() {
-    char temp[128];
+    char temp[256];
     sprintf(temp, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f",
         ambient[0], ambient[1], ambient[2],
         diffuse[0], diffuse[1], diffuse[2],
@@ -254,52 +256,49 @@ string P3Material::Encode() {
 }
 
 string P3Geometry::Encode() {
-    char temp[128];
-    sprintf(temp, "material: %s\n", mat->Encode());
-
-    return string(temp);
+    return string("material: ") + mat->Encode() + string("\n");
 }
 
 string P3Sphere::Encode() {
-    char temp[128];
+    char temp[256];
     sprintf(temp, "sphere: %f %f %f %f", pos[0], pos[1], pos[2], rad);
 
     return P3Geometry::Encode() + string(temp);
 }
 
 string P3Light::Encode() {
-    char temp[128];
+    char temp[256];
     sprintf(temp, "%f %f %f", col[0], col[1], col[2]);
     
     return string(temp);
 }
 
 string P3AmbientLight::Encode() {
-    char temp[128];
-    sprintf(temp, "ambient_light: %s", P3Light::Encode());
-    
-    return string(temp);
+    stringstream ss;
+    ss << "ambient_light: " << P3Light::Encode();
+
+    return ss.str();
 }
 
 string P3DirectionalLight::Encode() {
-    char temp[128];
-    sprintf(temp, "directional_light: %s %f %f %f", P3Light::Encode(), dir[0], dir[1], dir[2]);
+    stringstream ss;
+    ss << "directional_light: " << P3Light::Encode() << " " << dir[0] << " " << dir[1] << " " << dir[2];
 
-    return string(temp);
+    return ss.str();
 }
 
 string P3PointLight::Encode() {
-    char temp[128];
-    sprintf(temp, "point_light: %s %f %f %f", P3Light::Encode(), pos[0], pos[1], pos[2]);
+    stringstream ss;
+    ss << "point_light: " << P3Light::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2];
 
-    return string(temp);
+    return ss.str();
 }
 
 string P3SpotLight::Encode() {
-    char temp[128];
-    sprintf(temp, "spot_light: %s %f %f %f %f %f %f %f %f", P3Light::Encode(), pos[0], pos[1], pos[2], dir[0], dir[1], dir[2], angle1, angle2);
+    stringstream ss;
+    ss << "spot_light: " << P3Light::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2] << dir[0] << " " << dir[1] << " " << dir[2] << " " << angle1 << " " << angle2;
 
-    return string(temp);
+    return ss.str();
 }
 
 
@@ -338,6 +337,55 @@ void Load() {
     string line;
     while (getline(scene_file, line)) {
         string rest;
+
+        rest = rest_if_prefix("camera_pos: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> cp[0] >> cp[1] >> cp[2];
+        }
+
+        rest = rest_if_prefix("camera_fwd: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> cf[0] >> cf[1] >> cf[2];
+        }
+
+        rest = rest_if_prefix("camera_up: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> cu[0] >> cu[1] >> cu[2];
+        }
+
+        rest = rest_if_prefix("camera_fov_ha: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> fov_ha;
+        }
+
+        rest = rest_if_prefix("film_resolution: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> window_res[0] >> window_res[1];
+        }
+
+        rest = rest_if_prefix("output_image: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> output_name;
+        }
+
+        rest = rest_if_prefix("background: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> bc[0] >> bc[1] >> bc[2];
+        }
+
+        rest = rest_if_prefix("max_depth: ", line);
+        if (rest != "") {
+            stringstream ss(rest);
+            ss >> max_depth;
+        }
+
         rest = rest_if_prefix("sphere: ", line);
         if (rest != "") {
             P3Sphere* new_sphere = new P3Sphere();
@@ -380,11 +428,49 @@ void Load() {
             lights.push_back(new_light);
         }
     }
+    scene_file.close();
 }
 
 
 void Save() {
-    if (string(scene_name) == "") { return; }
+    string scene_string = "scenes/" + string(scene_name);
+    string end_string = ".p3";
+    if (scene_string == "") { return; }
+    if (scene_string.length() < end_string.length()) { return; }
+    if (scene_string.compare(scene_string.length() - end_string.length(),
+        end_string.length(), end_string) != 0) {
+        return;
+    }
+
+
+    ofstream scene_file(scene_string);
+    if (!scene_file.is_open()) { return; }
+
+    scene_file << "camera_pos: " << cp[0] << " " << cp[1] << " " << cp[2] << " " << endl;
+
+    scene_file << "camera_fwd: " << cf[0] << " " << cf[1] << " " << cf[2] << " " << endl;
+
+    scene_file << "camera_up: " << cu[0] << " " << cu[1] << " " << cu[2] << " " << endl;
+
+    scene_file << "camera_fov_ha: " << fov_ha << endl;
+
+    scene_file << "film_resolution: " << window_res[0] << " " << window_res[1] << endl;
+
+    scene_file << "output_image: " << output_name << endl;
+
+    scene_file << "background: " << bc[0] << " " << bc[1] << " " << bc[2] << " " << endl;
+
+    scene_file << "max_depth: " << max_depth << endl;
+
+    for (P3Geometry* geo : shapes) {
+        scene_file << geo->Encode() << endl;
+    }
+
+    for (P3Light* light : lights) {
+        scene_file << light->Encode() << endl;
+    }
+
+    scene_file.close();
 }
 
 void Render() {
@@ -412,7 +498,7 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Project 3, Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    SDL_Window* window = SDL_CreateWindow("Project 3, Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 2560, 720, window_flags);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1); // Enable vsync
@@ -471,8 +557,8 @@ int main(int argc, char** argv) {
             Load();
         }
         ImGui::SameLine();
-        ImGui::InputTextWithHint("", "file.p3", scene_name, 128, ImGuiInputTextFlags_CharsNoBlank);
-        ImGui::InputTextWithHint("Output Name", "output.png", output_name, 128, ImGuiInputTextFlags_CharsNoBlank);
+        ImGui::InputTextWithHint("", "file.p3", scene_name, 256, ImGuiInputTextFlags_CharsNoBlank);
+        ImGui::InputTextWithHint("Output Name", "output.png", output_name, 256, ImGuiInputTextFlags_CharsNoBlank);
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
@@ -482,6 +568,8 @@ int main(int argc, char** argv) {
             ImGui::SliderFloat3("Camera Up", cu, -1.0f, 1.0f);
             ImGui::SliderFloat("FOV", &fov_ha, 0.0f, 90.0f);
             ImGui::InputInt2("Resolution", window_res, 1);
+            ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
+            ImGui::ColorPicker3("Background Color", bc);
         }
         ImGui::PopStyleColor(2);
         
