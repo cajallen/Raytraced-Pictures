@@ -2,17 +2,25 @@
 
 #include "main.h"
 
+// GLOBAL STATE
 vector<P3Geometry*> shapes{};
+vector<P3AmbientLight*> lights{};
 P3Material current_material = P3Material();
 int shape_count = 0;
 int material_count = 0;
+int light_count = 0;
+char scene_name[128] = "";
+
+// CAMERA SETTINGS
 float cp[3]{ 0.0f, 0.0f, 0.0f };
 float cf[3]{ 0.0f, 0.0f, 1.0f };
 float cu[3]{ 0.0f, 1.0f, 0.0f };
 float fov_ha = 45.0f;
 int window_res[2]{ 640, 480 };
+
+// OTHER SETTINGS
+int max_depth = 5;
 char output_name[128] = "";
-char scene_name[128] = "";
 
 
 string rest_if_prefix(const string prefix, string content) {
@@ -29,6 +37,10 @@ string P3Geometry::with_id(string s) {
 }
 
 string P3Material::with_id(string s) {
+    return (s + std::to_string(id)).c_str();
+}
+
+string P3AmbientLight::with_id(string s) {
     return (s + std::to_string(id)).c_str();
 }
 
@@ -51,23 +63,6 @@ P3Geometry::P3Geometry(int old_id) {
 	id = old_id;
     mat = current_material;
 }
-
-void P3Geometry::ImGui() {
-	ImGui::Indent(6.0f);
-	if (ImGui::CollapsingHeader(Name().c_str())) {
-		if (ImGui::Button(with_id("Sphere").c_str())) {
-            auto iter = GetIter();
-            P3Geometry* old = *iter;
-            *iter = new P3Sphere(id);
-            delete old;
-		}
-		if (ImGui::Button("Delete")) {
-			Delete();
-		}
-	}
-	ImGui::Unindent(6.0f);
-}
-
 
 void P3Geometry::Delete() {
 	shapes.erase(GetIter());
@@ -99,6 +94,23 @@ void P3Sphere::ImGui() {
 }
 
 
+void P3Geometry::ImGui() {
+    ImGui::Indent(6.0f);
+    if (ImGui::CollapsingHeader(Name().c_str())) {
+        if (ImGui::Button(with_id("Sphere").c_str())) {
+            auto iter = GetIter();
+            P3Geometry* old = *iter;
+            *iter = new P3Sphere(id);
+            delete old;
+        }
+        if (ImGui::Button("Delete")) {
+            Delete();
+        }
+    }
+    ImGui::Unindent(6.0f);
+}
+
+
 void P3Material::ImGui() {
     if (ImGui::CollapsingHeader(with_id("Material").c_str())) {
         ImGui::Indent(4.0f);
@@ -112,6 +124,19 @@ void P3Material::ImGui() {
     }
 }
 
+void P3AmbientLight::ImGui() {
+    if (ImGui::CollapsingHeader(with_id("Ambient Light").c_str())) {
+        ImGui::Indent(4.0f);
+        ImGui::ColorPicker3(with_id("color").c_str(), col);
+        ImGui::Unindent(4.0f);
+    }
+}
+
+
+P3AmbientLight::P3AmbientLight() {
+    id = light_count;
+    light_count++;
+}
 
 P3Material::P3Material() {
     id = material_count;
@@ -122,10 +147,10 @@ P3Material::P3Material(string s) {
     id = material_count;
     material_count++;
     stringstream ss(s);
-    ss >>   ambient[0] >> ambient[1] >> ambient[2] >>
-            diffuse[0] >> diffuse[1] >> diffuse[2] >>
-            specular[0] >> specular[1] >> specular[2] >> phong >>
-            transmissive[0] >> transmissive[1] >> transmissive[2] >> ior;
+    ss >>   ambient[0]      >> ambient[1]       >> ambient[2] >>
+            diffuse[0]      >> diffuse[1]       >> diffuse[2] >>
+            specular[0]     >> specular[1]      >> specular[2]      >> phong >>
+            transmissive[0] >> transmissive[1]  >> transmissive[2]  >> ior;
 }
 
 string P3Material::String() {
@@ -298,8 +323,11 @@ int main(int argc, char** argv) {
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Lighting")) {
+            for (P3AmbientLight* light : lights) {
+                light->ImGui();
+            }
             if (ImGui::Button("New Light", ImVec2(ImGui::GetWindowWidth(), 0))) {
-
+                lights.push_back(new P3AmbientLight());
             }
         }
         ImGui::PopStyleColor();

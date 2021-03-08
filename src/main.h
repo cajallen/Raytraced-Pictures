@@ -79,6 +79,42 @@ struct P3Sphere : P3Geometry {
 };
 
 
+struct P3AmbientLight {
+    float col[3] = { 0.0f, 0.0f, 0.0f };
+    int id = 0;
+
+    P3AmbientLight();
+    P3AmbientLight(int old_id) { }
+
+    virtual void ImGui();
+    virtual string String() { return ""; }
+    virtual string with_id(string s);
+};
+
+struct P3Light : P3AmbientLight {
+    float pos[3];
+
+    virtual void ImGui() { }
+    virtual string String() { return ""; }
+    virtual string with_id(string s) { return ""; }
+};
+
+struct P3SpotLight : P3Light {
+    float dir[3];
+    float angle1;
+    float angle2;
+
+    void ImGui() { }
+    string String() { return ""; }
+    string with_id(string s) { return ""; }
+};
+
+struct P3DirectionalLight : P3Light {
+    void ImGui() { }
+    string String() { return ""; }
+    string with_id(string s) { return ""; }
+};
+
 void Reset();
 void Load();
 void Render();
