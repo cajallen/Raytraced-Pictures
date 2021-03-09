@@ -327,14 +327,15 @@ void Reset() {
 
 void Load() {
     Reset();
-    string scene_string = "scenes/" + string(scene_name);
-    string end_string = ".p3";
-    if (scene_string == "") { return; }
-    if (scene_string.length() < end_string.length()) { return; }
-    if (scene_string.compare(scene_string.length() - end_string.length(),
-        end_string.length(), end_string) != 0) {
+    
+
+    if (string(scene_name) == "") {
         return;
     }
+
+    string scene_string = "scenes/" + string(scene_name) + ".p3";
+
+
 
     ifstream scene_file(scene_string);
     if (!scene_file.is_open()) { return; }
@@ -438,15 +439,11 @@ void Load() {
 
 
 void Save() {
-    string scene_string = "scenes/" + string(scene_name);
-    string end_string = ".p3";
-    if (scene_string == "") { return; }
-    if (scene_string.length() < end_string.length()) { return; }
-    if (scene_string.compare(scene_string.length() - end_string.length(),
-        end_string.length(), end_string) != 0) {
+    if (string(scene_name) == "") {
         return;
     }
 
+    string scene_string = "scenes/" + string(scene_name) + ".p3";
 
     ofstream scene_file(scene_string);
     if (!scene_file.is_open()) { return; }
@@ -590,7 +587,7 @@ int main(int argc, char** argv) {
             Load();
         }
         ImGui::SameLine();
-        ImGui::InputTextWithHint("", "file.p3", scene_name, 256, ImGuiInputTextFlags_CharsNoBlank);
+        ImGui::InputTextWithHint("", "<scene filename>", scene_name, 256, ImGuiInputTextFlags_CharsNoBlank);
         ImGui::InputTextWithHint("Output Name", "output.png", output_name, 256, ImGuiInputTextFlags_CharsNoBlank);
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
