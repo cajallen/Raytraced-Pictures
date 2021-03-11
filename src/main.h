@@ -25,11 +25,48 @@ using std::stringstream;
 #include <glad/glad.h>          // Initialize with gladLoadGL()
 
 
+namespace P3 {
+
 // This function is used as a helper to parse the keyed lines
 // Pseudo: if prefix_matches ? string_without_prefix : "";
 string rest_if_prefix(const string prefix, string content);
 
-struct P3Material {
+
+struct UIObject {
+    int id;
+
+    // Call with id to create new
+    UIObject();
+    // Call with id to replace
+    UIObject(int old_id);
+
+    virtual void ImGui() { }
+    virtual string Encode() { return ""; }
+    virtual void Decode(string s) { }
+
+    string WithId(string s);
+    bool operator==(UIObject rhs) { return id == rhs.id; }
+};
+
+
+struct UICamera : UIObject {
+    float cp[3]{ 0.0f, 0.0f, 0.0f };
+    float cf[3]{ 0.0f, 0.0f, 1.0f };
+    float cu[3]{ 0.0f, 1.0f, 0.0f };
+    float bc[3]{ 0.0f, 0.0f, 0.0f };
+    float fov_ha = 45.0f;
+    int window_res[2]{ 640, 480 };
+    int max_depth = 5;
+
+    using UIObject::UIObject;
+
+    void ImGui();
+    string Encode();
+    void Decode(string s); // Camera decode takes in the whole line, instead of post key, as it is multiline.
+};
+
+
+struct UIMaterial : UIObject{
     float ambient[3]{ 0.0f, 0.0f, 0.0f };
     float diffuse[3]{ 0.0f, 0.0f, 0.0f };
     float specular[3]{ 0.0f, 0.0f, 0.0f };
@@ -37,48 +74,34 @@ struct P3Material {
     float phong = 0.0f;
     float ior = 0.0f;
 
-    int id = 0;
-
-    // No old_id is needed, as we don't ever "replace" materials (non-polymorphic).
-    P3Material();
+    using UIObject::UIObject;
 
     void ImGui();
     string Encode();
     void Decode(string s);
-    string with_id(string s);
 };
+
 
 // This only needs to exist in preperation for other Geometry primitives.
-struct P3Geometry {
-    int id;
-    P3Material* mat;
+struct UIGeometry : UIObject {
+    UIMaterial* mat;
 
-    // Call without index to create new shapes
-    P3Geometry();
-    // Call with index to replace shapes (use old id)
-    P3Geometry(int old_id);
+    UIGeometry();
+    UIGeometry(int old_id);
 
-    virtual void ImGui();
-    virtual string Encode();
-    virtual void Decode(string s);
-
-    string with_id(string s);
-    vector<P3Geometry*>::iterator GetIter();
+    vector<UIGeometry*>::iterator GetIter();
     void Delete();
 
-
-    bool operator==(P3Geometry rhs) { return id == rhs.id; }
+    void ImGui();
+    string Encode();
+    void Decode(string s);
 };
 
-
-struct P3Sphere : P3Geometry {
+struct UISphere : UIGeometry {
     float pos[3]{ 0.0f, 0.0f, 0.0f };
     float rad = 1.0f;
 
-    // Call without index to create new shapes
-    P3Sphere() : P3Geometry() {}
-    // Call with index to replace shapes (use old id)
-    P3Sphere(int old_id) : P3Geometry(old_id) {}
+    using UIGeometry::UIGeometry;
 
     void ImGui();
     string Encode();
@@ -86,67 +109,67 @@ struct P3Sphere : P3Geometry {
 };
 
 
-struct P3Light {
+struct UILight : UIObject {
     float col[3] = { 0.0f, 0.0f, 0.0f };
-    int id = 0;
 
-    P3Light();
-    P3Light(int old_id);
+    using UIObject::UIObject;
 
-    virtual void ImGui();
-    virtual string Encode();
-    virtual void Decode(string s);
-    vector<P3Light*>::iterator GetIter();
+    vector<UILight*>::iterator GetIter();
     void Delete();
 
-    string with_id(string s);
+    void ImGui();
+    string Encode();
+    void Decode(string s);
 };
 
-
-struct P3AmbientLight : P3Light {
-    P3AmbientLight() : P3Light() {}
-    P3AmbientLight(int old_id) : P3Light(old_id) {}
+struct UIAmbientLight : UILight {
+    using UILight::UILight;
 
     void ImGui();
     string Encode();
     void Decode(string s);
 };
 
-struct P3PointLight : P3Light {
+struct UIPointLight : UILight {
     float pos[3] = { 0.0f, 0.0f, 0.0f };
 
-    P3PointLight() : P3Light() {}
-    P3PointLight(int old_id) : P3Light(old_id) {}
+    using UILight::UILight;
 
     void ImGui();
     string Encode();
     void Decode(string s);
 };
 
-struct P3DirectionalLight : P3Light {
+struct UIDirectionalLight : UILight {
     float dir[3] = { 0.0f, 0.0f, 0.0f };
 
-    P3DirectionalLight() : P3Light() {}
-    P3DirectionalLight(int old_id) : P3Light(old_id) {}
+    using UILight::UILight;
 
     void ImGui();
     string Encode();
     void Decode(string s);
 };
 
-struct P3SpotLight : P3Light {
+struct UISpotLight : UILight {
     float pos[3] = { 0.0f, 0.0f, 0.0f };
     float dir[3] = { 0.0f, 0.0f, 0.0f };
     float angle1 = 0.0f;
     float angle2 = 0.0f;
 
-    P3SpotLight() : P3Light() {}
-    P3SpotLight(int old_id) : P3Light(old_id) {}
+    using UILight::UILight;
 
     void ImGui();
     string Encode();
     void Decode(string s);
 };
+
+
+struct HitInformation {
+    float viewing;
+    float pos;
+    float normal;
+};
+
 
 void Reset();
 void Load();
@@ -154,3 +177,5 @@ void Save();
 void Render();
 
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
+
+}

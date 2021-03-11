@@ -7,87 +7,73 @@
 #include "image_lib.h"
 #include "main.h"
 
+
+namespace P3 {
+
 // GLOBAL STATE
-vector<P3Geometry*> shapes{};
-vector<P3Light*> lights{};
-// We need to keep a vector of materials to free them.
-vector<P3Material*> materials{ new P3Material() };
+vector<UIGeometry*> shapes{};
+vector<UILight*> lights{};
+vector<UIMaterial*> materials{ new UIMaterial() };
+UICamera* camera = new UICamera();
 int entity_count = 0;
 char scene_name[256] = "";
 
-// CAMERA SETTINGS
-float cp[3]{ 0.0f, 0.0f, 0.0f };
-float cf[3]{ 0.0f, 0.0f, 1.0f };
-float cu[3]{ 0.0f, 1.0f, 0.0f };
-float bc[3]{ 0.0f, 0.0f, 0.0f };
-float fov_ha = 45.0f;
-int window_res[2]{ 640, 480 };
-
 // OTHER SETTINGS
-int max_depth = 5;
 char output_name[256] = "raytraced.bmp";
 
 
 string rest_if_prefix(const string prefix, string content) {
     if (content.compare(0, prefix.length(), prefix) == 0) {
         return content.substr(prefix.length());
-    } else {
+    }
+    else {
         return "";
     }
 }
 
 
-string P3Geometry::with_id(string s) {
-    return (s + std::to_string(id)).c_str();
+UIObject::UIObject() {
+    id = entity_count;
+    entity_count++;
 }
 
-string P3Material::with_id(string s) {
-    return (s + std::to_string(id)).c_str();
+UIObject::UIObject(int old_id) {
+    id = old_id;
 }
 
-string P3Light::with_id(string s) {
+
+string UIObject::WithId(string s) {
     return (s + std::to_string(id)).c_str();
 }
 
 
 // Call without index to create new shapes
-P3Geometry::P3Geometry() {
-	id = entity_count;
-	entity_count++;
+UIGeometry::UIGeometry() : UIObject() {
     mat = materials.back();
 }
 // Call with index to replace shapes (use old id)
-P3Geometry::P3Geometry(int old_id) {
-	id = old_id;
+UIGeometry::UIGeometry(int old_id) : UIObject(old_id) {
     mat = materials.back();
 }
 
-P3Light::P3Light() {
-    id = entity_count;
-    entity_count++;
-}
 
-P3Light::P3Light(int old_id) {
-    id = old_id;
-}
-
-void P3Geometry::Delete() { shapes.erase(GetIter()); }
-void P3Light::Delete() { lights.erase(GetIter()); }
+void UIGeometry::Delete() { shapes.erase(GetIter()); }
+void UILight::Delete() { lights.erase(GetIter()); }
 
 
-vector<P3Geometry*>::iterator P3Geometry::GetIter() {
-	for (vector<P3Geometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
-		if ((*it)->id == id) {
-			return it;
-		}
-	}
+vector<UIGeometry*>::iterator UIGeometry::GetIter() {
+    for (vector<UIGeometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
+        if ((*it)->id == id) {
+            return it;
+        }
+    }
     cout << "Geometry not found in shapes" << endl;
     return shapes.end();
 }
 
 
-vector<P3Light*>::iterator P3Light::GetIter() {
-    for (vector<P3Light*>::iterator it = lights.begin(); it < lights.end(); it++) {
+vector<UILight*>::iterator UILight::GetIter() {
+    for (vector<UILight*>::iterator it = lights.begin(); it < lights.end(); it++) {
         if ((*it)->id == id) {
             return it;
         }
@@ -97,31 +83,43 @@ vector<P3Light*>::iterator P3Light::GetIter() {
 }
 
 
-void P3Geometry::ImGui() {
+void UICamera::ImGui() {
+    if (ImGui::CollapsingHeader("Camera Parameters")) {
+        ImGui::InputFloat3("Camera Position", cp);
+        ImGui::SliderFloat3("Camera Forward", cf, -1.0f, 1.0f);
+        ImGui::SliderFloat3("Camera Up", cu, -1.0f, 1.0f);
+        ImGui::SliderFloat("FOV", &fov_ha, 0.0f, 90.0f);
+        ImGui::InputInt2("Resolution", window_res, 1);
+        ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
+        ImGui::ColorPicker3("Background Color", bc);
+    }
+}
+
+void UIGeometry::ImGui() {
     ImGui::Indent(6.0f);
-    if (ImGui::CollapsingHeader(with_id("Geometry ").c_str())) {
-        if (ImGui::Button(with_id("Sphere").c_str())) {
+    if (ImGui::CollapsingHeader(WithId("Geometry ").c_str())) {
+        if (ImGui::Button(WithId("Sphere").c_str())) {
             auto iter = GetIter();
-            P3Geometry* old = *iter;
-            *iter = new P3Sphere(id);
+            UIGeometry* old = *iter;
+            *iter = new UISphere(id);
             delete old;
         }
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
     }
     ImGui::Unindent(6.0f);
 }
 
-void P3Sphere::ImGui() {
+void UISphere::ImGui() {
     ImGui::Indent(6.0f);
-    if (ImGui::CollapsingHeader(with_id("Sphere ").c_str())) {
-        ImGui::InputFloat3(with_id("pos##").c_str(), pos);
-        ImGui::SliderFloat(with_id("radius##").c_str(), &rad, 0.001f, 10.0f);
+    if (ImGui::CollapsingHeader(WithId("Sphere ").c_str())) {
+        ImGui::InputFloat3(WithId("pos##").c_str(), pos);
+        ImGui::SliderFloat(WithId("radius##").c_str(), &rad, 0.001f, 10.0f);
         ImGui::Indent(3.0f);
         mat->ImGui();
         ImGui::Unindent(3.0f);
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
     }
@@ -129,25 +127,25 @@ void P3Sphere::ImGui() {
 }
 
 
-void P3Material::ImGui() {
+void UIMaterial::ImGui() {
     // TODO: "Make Unique" button
-    if (ImGui::CollapsingHeader(with_id("Material ").c_str())) {
+    if (ImGui::CollapsingHeader(WithId("Material ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::SliderFloat3(with_id("ambient##").c_str(), ambient, 0.0f, 1.0f);
-        ImGui::SliderFloat3(with_id("diffuse##").c_str(), diffuse, 0.0f, 1.0f);
-        ImGui::SliderFloat3(with_id("specular##").c_str(), specular, 0.0f, 1.0f);
-        ImGui::SliderFloat3(with_id("transmissive##").c_str(), transmissive, 0.0f, 1.0f);
-        ImGui::SliderFloat(with_id("phong##").c_str(), &phong, 0.0f, 10.0f);
-        ImGui::SliderFloat(with_id("ior##").c_str(), &ior, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("ambient##").c_str(), ambient, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("diffuse##").c_str(), diffuse, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("specular##").c_str(), specular, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("transmissive##").c_str(), transmissive, 0.0f, 1.0f);
+        ImGui::SliderFloat(WithId("phong##").c_str(), &phong, 0.0f, 10.0f);
+        ImGui::SliderFloat(WithId("ior##").c_str(), &ior, 0.0f, 1.0f);
         ImGui::Unindent(4.0f);
     }
 }
 
 
-void P3Light::ImGui() {
-    if (ImGui::CollapsingHeader(with_id("Light ").c_str())) {
+void UILight::ImGui() {
+    if (ImGui::CollapsingHeader(WithId("Light ").c_str())) {
         ImGui::Indent(4.0f);
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
         ImGui::Unindent(4.0f);
@@ -155,45 +153,45 @@ void P3Light::ImGui() {
 }
 
 
-void P3AmbientLight::ImGui() {
-    if (ImGui::CollapsingHeader(with_id("Ambient ").c_str())) {
+void UIAmbientLight::ImGui() {
+    if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::ColorPicker3(with_id("color##").c_str(), col);
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
         ImGui::Unindent(4.0f);
     }
 }
 
-void P3PointLight::ImGui() {
-    if (ImGui::CollapsingHeader(with_id("Point ").c_str())) {
+void UIPointLight::ImGui() {
+    if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::InputFloat3(with_id("pos##").c_str(), pos);
-        ImGui::ColorPicker3(with_id("color##").c_str(), col);
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        ImGui::InputFloat3(WithId("pos##").c_str(), pos);
+        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
         ImGui::Unindent(4.0f);
     }
 }
 
-void P3SpotLight::ImGui() {
-    if (ImGui::CollapsingHeader(with_id("Spot ").c_str())) {
+void UISpotLight::ImGui() {
+    if (ImGui::CollapsingHeader(WithId("Spot ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::ColorPicker3(with_id("color##").c_str(), col);
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
         ImGui::Unindent(4.0f);
     }
 }
 
-void P3DirectionalLight::ImGui() {
-    if (ImGui::CollapsingHeader(with_id("Directional ").c_str())) {
+void UIDirectionalLight::ImGui() {
+    if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::ColorPicker3(with_id("color##").c_str(), col);
-        if (ImGui::Button(with_id("Delete##").c_str())) {
+        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
         ImGui::Unindent(4.0f);
@@ -201,55 +199,118 @@ void P3DirectionalLight::ImGui() {
 }
 
 
-P3Material::P3Material() {
-    id = entity_count;
-    entity_count++;
+void UICamera::Decode(string s) {
+    string rest;
+    rest = rest_if_prefix("camera_pos: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> cp[0] >> cp[1] >> cp[2];
+    }
+
+    rest = rest_if_prefix("camera_fwd: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> cf[0] >> cf[1] >> cf[2];
+    }
+
+    rest = rest_if_prefix("camera_up: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> cu[0] >> cu[1] >> cu[2];
+    }
+
+    rest = rest_if_prefix("camera_fov_ha: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> fov_ha;
+    }
+
+    rest = rest_if_prefix("film_resolution: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> window_res[0] >> window_res[1];
+    }
+
+    rest = rest_if_prefix("output_image: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> output_name;
+    }
+
+    rest = rest_if_prefix("background: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> bc[0] >> bc[1] >> bc[2];
+    }
+
+    rest = rest_if_prefix("max_depth: ", s);
+    if (rest != "") {
+        stringstream ss(rest);
+        ss >> max_depth;
+    }
 }
 
-void P3Material::Decode(string s) {
+
+void UIMaterial::Decode(string s) {
     stringstream ss(s);
-    ss >>   ambient[0]      >> ambient[1]       >> ambient[2] >>
-            diffuse[0]      >> diffuse[1]       >> diffuse[2] >>
-            specular[0]     >> specular[1]      >> specular[2]      >> phong >>
-            transmissive[0] >> transmissive[1]  >> transmissive[2]  >> ior;
+    ss >> ambient[0] >> ambient[1] >> ambient[2] >>
+        diffuse[0] >> diffuse[1] >> diffuse[2] >>
+        specular[0] >> specular[1] >> specular[2] >> phong >>
+        transmissive[0] >> transmissive[1] >> transmissive[2] >> ior;
 }
 
-void P3Geometry::Decode(string s) {
+void UIGeometry::Decode(string s) {
 }
 
 
-void P3Sphere::Decode(string s) {
+void UISphere::Decode(string s) {
     stringstream ss(s);
     ss >> pos[0] >> pos[1] >> pos[2] >> rad;
 }
 
-void P3Light::Decode(string s) {
+void UILight::Decode(string s) {
     stringstream ss(s);
     ss >> col[0] >> col[1] >> col[2];
 }
 
-void P3AmbientLight::Decode(string s) {
+void UIAmbientLight::Decode(string s) {
     stringstream ss(s);
     ss >> col[0] >> col[1] >> col[2];
 }
 
-void P3PointLight::Decode(string s) {
+void UIPointLight::Decode(string s) {
     stringstream ss(s);
     ss >> col[0] >> col[1] >> col[2] >> pos[0] >> pos[1] >> pos[2];
 }
 
-void P3DirectionalLight::Decode(string s) {
+void UIDirectionalLight::Decode(string s) {
     stringstream ss(s);
     ss >> col[0] >> col[1] >> col[2] >> dir[0] >> dir[1] >> dir[2];
 }
 
-void P3SpotLight::Decode(string s) {
+void UISpotLight::Decode(string s) {
     stringstream ss(s);
     ss >> col[0] >> col[1] >> col[2] >> pos[0] >> pos[1] >> pos[2] >> dir[0] >> dir[1] >> dir[2] >> angle1 >> angle2;
 }
 
 
-string P3Material::Encode() {
+string UICamera::Encode() {
+    stringstream ss;
+
+    ss << "camera_pos: " << cp[0] << " " << cp[1] << " " << cp[2] << " " << endl;
+    ss << "camera_fwd: " << cf[0] << " " << cf[1] << " " << cf[2] << " " << endl;
+    ss << "camera_up: " << cu[0] << " " << cu[1] << " " << cu[2] << " " << endl;
+    ss << "camera_fov_ha: " << fov_ha << endl;
+    ss << "film_resolution: " << window_res[0] << " " << window_res[1] << endl;
+    ss << "output_image: " << output_name << endl;
+    ss << "background: " << bc[0] << " " << bc[1] << " " << bc[2] << " " << endl;
+    ss << "max_depth: " << max_depth << endl;
+
+    return ss.str();
+}
+
+
+string UIMaterial::Encode() {
     char temp[256];
     sprintf(temp, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f",
         ambient[0], ambient[1], ambient[2],
@@ -260,74 +321,78 @@ string P3Material::Encode() {
     return string(temp);
 }
 
-string P3Geometry::Encode() {
+string UIGeometry::Encode() {
     return string("material: ") + mat->Encode() + string("\n");
 }
 
-string P3Sphere::Encode() {
+string UISphere::Encode() {
     char temp[256];
     sprintf(temp, "sphere: %f %f %f %f", pos[0], pos[1], pos[2], rad);
 
-    return P3Geometry::Encode() + string(temp);
+    return UIGeometry::Encode() + string(temp);
 }
 
-string P3Light::Encode() {
+string UILight::Encode() {
     char temp[256];
     sprintf(temp, "%f %f %f", col[0], col[1], col[2]);
-    
+
     return string(temp);
 }
 
-string P3AmbientLight::Encode() {
+string UIAmbientLight::Encode() {
     stringstream ss;
-    ss << "ambient_light: " << P3Light::Encode();
+    ss << "ambient_light: " << UILight::Encode();
 
     return ss.str();
 }
 
-string P3DirectionalLight::Encode() {
+string UIDirectionalLight::Encode() {
     stringstream ss;
-    ss << "directional_light: " << P3Light::Encode() << " " << dir[0] << " " << dir[1] << " " << dir[2];
+    ss << "directional_light: " << UILight::Encode() << " " << dir[0] << " " << dir[1] << " " << dir[2];
 
     return ss.str();
 }
 
-string P3PointLight::Encode() {
+string UIPointLight::Encode() {
     stringstream ss;
-    ss << "point_light: " << P3Light::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2];
+    ss << "point_light: " << UILight::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2];
 
     return ss.str();
 }
 
-string P3SpotLight::Encode() {
+string UISpotLight::Encode() {
     stringstream ss;
-    ss << "spot_light: " << P3Light::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2] << dir[0] << " " << dir[1] << " " << dir[2] << " " << angle1 << " " << angle2;
+    ss << "spot_light: " << UILight::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2] << dir[0] << " " << dir[1] << " " << dir[2] << " " << angle1 << " " << angle2;
 
     return ss.str();
 }
 
 
 void Reset() {
+    delete camera;
+    for (UIGeometry* o : shapes) {
+        delete o;
+    }
+    for (UILight* o : lights) {
+        delete o;
+    }
+    for (UIMaterial* o : materials) {
+        delete o;
+    }
     shapes.clear();
     lights.clear();
     materials.clear();
-    entity_count = 0;
-    materials.push_back(new P3Material());
-    std::fill(cp, cp + 3, 0.0f);
-    std::fill(cf, cf + 3, 0.0f);
-    cf[2] = 1.0f;
-    std::fill(cu, cu + 3, 0.0f);
-    cu[1] = 1.0f;
-    fov_ha = 45.0f;
-    window_res[0] = 640;
-    window_res[1] = 480;
+
     strcpy(output_name, "");
+
+    entity_count = 0;
+    materials.push_back(new UIMaterial());
+    camera = new UICamera();
 }
 
 
 void Load() {
     Reset();
-    
 
     if (string(scene_name) == "") {
         return;
@@ -344,92 +409,46 @@ void Load() {
     while (getline(scene_file, line)) {
         string rest;
 
-        rest = rest_if_prefix("camera_pos: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> cp[0] >> cp[1] >> cp[2];
-        }
-
-        rest = rest_if_prefix("camera_fwd: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> cf[0] >> cf[1] >> cf[2];
-        }
-
-        rest = rest_if_prefix("camera_up: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> cu[0] >> cu[1] >> cu[2];
-        }
-
-        rest = rest_if_prefix("camera_fov_ha: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> fov_ha;
-        }
-
-        rest = rest_if_prefix("film_resolution: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> window_res[0] >> window_res[1];
-        }
-
-        rest = rest_if_prefix("output_image: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> output_name;
-        }
-
-        rest = rest_if_prefix("background: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> bc[0] >> bc[1] >> bc[2];
-        }
-
-        rest = rest_if_prefix("max_depth: ", line);
-        if (rest != "") {
-            stringstream ss(rest);
-            ss >> max_depth;
-        }
+        camera->Decode(line);
 
         rest = rest_if_prefix("sphere: ", line);
         if (rest != "") {
-            P3Sphere* new_sphere = new P3Sphere();
+            UISphere* new_sphere = new UISphere();
             new_sphere->Decode(rest);
             shapes.push_back(new_sphere);
         }
 
         rest = rest_if_prefix("material: ", line);
         if (rest != "") {
-            P3Material* new_mat = new P3Material();
+            UIMaterial* new_mat = new UIMaterial();
             new_mat->Decode(rest);
             materials.push_back(new_mat);
         }
 
         rest = rest_if_prefix("ambient_light: ", line);
         if (rest != "") {
-            P3AmbientLight* new_light = new P3AmbientLight();
+            UIAmbientLight* new_light = new UIAmbientLight();
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("directional_light: ", line);
         if (rest != "") {
-            P3DirectionalLight* new_light = new P3DirectionalLight();
+            UIDirectionalLight* new_light = new UIDirectionalLight();
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("point_light: ", line);
         if (rest != "") {
-            P3PointLight* new_light = new P3PointLight();
+            UIPointLight* new_light = new UIPointLight();
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("spot_light: ", line);
         if (rest != "") {
-            P3SpotLight* new_light = new P3SpotLight();
+            UISpotLight* new_light = new UISpotLight();
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
@@ -448,27 +467,13 @@ void Save() {
     ofstream scene_file(scene_string);
     if (!scene_file.is_open()) { return; }
 
-    scene_file << "camera_pos: " << cp[0] << " " << cp[1] << " " << cp[2] << " " << endl;
+    scene_file << camera->Encode() << endl;
 
-    scene_file << "camera_fwd: " << cf[0] << " " << cf[1] << " " << cf[2] << " " << endl;
-
-    scene_file << "camera_up: " << cu[0] << " " << cu[1] << " " << cu[2] << " " << endl;
-
-    scene_file << "camera_fov_ha: " << fov_ha << endl;
-
-    scene_file << "film_resolution: " << window_res[0] << " " << window_res[1] << endl;
-
-    scene_file << "output_image: " << output_name << endl;
-
-    scene_file << "background: " << bc[0] << " " << bc[1] << " " << bc[2] << " " << endl;
-
-    scene_file << "max_depth: " << max_depth << endl;
-
-    for (P3Geometry* geo : shapes) {
+    for (UIGeometry* geo : shapes) {
         scene_file << geo->Encode() << endl;
     }
 
-    for (P3Light* light : lights) {
+    for (UILight* light : lights) {
         scene_file << light->Encode() << endl;
     }
 
@@ -477,8 +482,8 @@ void Save() {
 
 
 void Render() {
-    Point3D eye = Point3D(cp[0], cp[1], cp[2]);
-    Dir3D forward = Dir3D(cf[0], cf[1], cf[2]).normalized();
+    Point3D eye = Point3D(camera->cp[0], camera->cp[1], camera->cp[2]);
+    Dir3D forward = Dir3D(camera->cf[0], camera->cf[1], camera->cf[2]).normalized();
     Dir3D up = Dir3D(cu[0], cu[1], cu[2]);
     Dir3D right = cross(up, forward).normalized();
     up = cross(forward, up).normalized();
@@ -491,7 +496,6 @@ void Render() {
     Image outputImg = Image(imgW, imgH);
     for (int i = 0; i < imgW; i++) {
         for (int j = 0; j < imgH; j++) {
-            //TODO: In what way does this assumes the basis is orthonormal?
             float u = (halfW - (window_res[0]) * ((i + 0.5) / imgW));
             float v = (halfH - (window_res[1]) * ((j + 0.5) / imgH));
             Point3D p = eye - d * forward + u * right + v * up;
@@ -507,6 +511,43 @@ void Render() {
     outputImg.write(output_name);
 }
 
+
+// From Dear ImGui wiki
+bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height) {
+    // Load from file
+    int image_width = 0;
+    int image_height = 0;
+    unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
+    if (image_data == NULL)
+        return false;
+
+    // Create a OpenGL texture identifier
+    GLuint image_texture;
+    glGenTextures(1, &image_texture);
+    glBindTexture(GL_TEXTURE_2D, image_texture);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+    // Upload pixels into texture
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+    stbi_image_free(image_data);
+
+    *out_texture = image_texture;
+    *out_width = image_width;
+    *out_height = image_height;
+
+    return true;
+}
+}
+
+using namespace P3;
 
 // Main code
 int main(int argc, char** argv) {
@@ -592,24 +633,16 @@ int main(int argc, char** argv) {
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
-        if (ImGui::CollapsingHeader("Camera Parameters")) {
-            ImGui::InputFloat3("Camera Position", cp);
-            ImGui::SliderFloat3("Camera Forward", cf, -1.0f, 1.0f);
-            ImGui::SliderFloat3("Camera Up", cu, -1.0f, 1.0f);
-            ImGui::SliderFloat("FOV", &fov_ha, 0.0f, 90.0f);
-            ImGui::InputInt2("Resolution", window_res, 1);
-            ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
-            ImGui::ColorPicker3("Background Color", bc);
-        }
+        camera->ImGui();
         ImGui::PopStyleColor(2);
         
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 0.7, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Geometry")) {
-            for (P3Geometry* shape : shapes) {
+            for (UIGeometry* shape : shapes) {
                 shape->ImGui();
             }
             if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth(), 0))) {
-                shapes.push_back(new P3Sphere());
+                shapes.push_back(new UISphere());
             }
         }
         ImGui::PopStyleColor();
@@ -617,23 +650,23 @@ int main(int argc, char** argv) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Lighting")) {
             float spacing = 4.0f;
-            for (P3Light* light : lights) {
+            for (UILight* light : lights) {
                 light->ImGui();
             }
             if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new P3AmbientLight());
+                lights.push_back(new UIAmbientLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new P3PointLight());
+                lights.push_back(new UIPointLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new P3SpotLight());
+                lights.push_back(new UISpotLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new P3DirectionalLight());
+                lights.push_back(new UIDirectionalLight());
             }
         }
         ImGui::PopStyleColor();
@@ -663,15 +696,15 @@ int main(int argc, char** argv) {
         SDL_GL_SwapWindow(window);
     }
 
-    for (P3Geometry* geo : shapes) {
+    for (UIGeometry* geo : shapes) {
         delete geo;
     }
 
-    for (P3Light* light : lights) {
+    for (UILight* light : lights) {
         delete light;
     }
 
-    for (P3Material* mat : materials) {
+    for (UIMaterial* mat : materials) {
         delete mat;
     }
 
@@ -685,39 +718,4 @@ int main(int argc, char** argv) {
     SDL_Quit();
 
     return 0;
-}
-
-
-// From Dear ImGui wiki
-bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height) {
-    // Load from file
-    int image_width = 0;
-    int image_height = 0;
-    unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
-    if (image_data == NULL)
-        return false;
-
-    // Create a OpenGL texture identifier
-    GLuint image_texture;
-    glGenTextures(1, &image_texture);
-    glBindTexture(GL_TEXTURE_2D, image_texture);
-
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-
-    // Upload pixels into texture
-#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-    stbi_image_free(image_data);
-
-    *out_texture = image_texture;
-    *out_width = image_width;
-    *out_height = image_height;
-
-    return true;
 }
