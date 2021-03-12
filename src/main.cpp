@@ -19,6 +19,9 @@ UICamera* ui_camera = new UICamera();
 int entity_count = 0;
 char scene_name[256] = "";
 
+ImVec2 disp_img_size{ 0.0, 0.0 };
+GLuint disp_img_tex = 0;
+
 // OTHER SETTINGS
 char output_name[256] = "raytraced.bmp";
 
@@ -368,18 +371,72 @@ string UISpotLight::Encode() {
     return ss.str();
 }
 
+
+Geometry* UIGeometry::ToGeometry() {
+    return new Geometry(this);
+}
+
+Geometry* UISphere::ToGeometry() {
+    return new Sphere(this);
+}
+
+
 Camera::Camera(UICamera* from) {
     position = Point3D(from->cp[0], from->cp[1], from->cp[2]);
     background_color = Color(from->bc[0], from->bc[1], from->bc[2]);
     half_vfov = from->fov_ha;
-    res = {from->window_res[0], from->window_res[1]};
-    mid_res = { res[0]/2.0, res[1]/2.0 };
+    res = {from->window_res[X], from->window_res[Y]};
+    mid_res = { res[X]/2, res[Y]/2 };
     max_depth = from->max_depth;
 
     forward = Dir3D(from->cf[0], from->cf[1], from->cf[2]).normalized();
     up = Dir3D(from->cu[0], from->cu[1], from->cu[2]);
     right = cross(up, forward).normalized();
     up = cross(forward, up).normalized();
+}
+
+
+Material::Material(UIMaterial* from) {
+    ambient = Color(from->ambient[0], from->ambient[1], from->ambient[2]);
+    diffuse = Color(from->diffuse[0], from->diffuse[1], from->diffuse[2]);
+    specular = Color(from->specular[0], from->specular[1], from->specular[2]);
+    transmissive = Color(from->transmissive[0], from->transmissive[1], from->transmissive[2]);
+    phong = from->phong;
+    ior = from->ior;
+}
+
+
+Geometry::Geometry(UIGeometry* from) {
+    material = Material(from->mat);
+}
+
+
+Sphere::Sphere(UISphere* from) : Geometry(from) {
+    position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
+    radius = from->rad;
+}
+
+
+bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
+    Dir3D toStart = (ray.pos - position);
+    float b = 2 * dot(ray.dir, toStart);
+    float c = dot(toStart, toStart) - pow(radius, 2);
+    float discr = pow(b, 2) - 4 * c;
+
+    if (discr < 0) return false;
+
+    float t0 = (-b + sqrt(discr)) / 2;
+    float t1 = (-b - sqrt(discr)) / 2;
+    float mint = t0;
+    if (t1 > 0.0 && t1 > t0) mint = t1;
+
+    if (mint < 0.0) return false;
+
+    Point3D hit_pos = ray.pos + mint * ray.dir;
+    Dir3D hit_norm = (hit_pos - position).normalized();
+    *intersection = HitInformation{ mint, hit_pos, ray.dir, hit_norm };
+    
+    return true;
 }
 
 
@@ -501,22 +558,47 @@ void Render() {
 
     float d = c.mid_res[Y] / tanf(c.half_vfov * (M_PI / 180.0f));
 
+    vector<Geometry*> geometry;
+    for (UIGeometry* geo : ui_shapes) {
+        geometry.push_back(geo->ToGeometry());
+    }
+
     Image outputImg = Image(c.res[X], c.res[Y]);
     for (int i = 0; i < c.res[X]; i++) {
         for (int j = 0; j < c.res[Y]; j++) {
-            float u = (c.mid_res[X] - (c.res[X]) * ((i + 0.5) / c.res[X]));
-            float v = (c.mid_res[Y] - (c.res[Y]) * ((j + 0.5) / c.res[Y]));
+            float u = c.mid_res[X] - c.res[X]*((i + 0.5) / c.res[X]);
+            float v = c.mid_res[Y] - c.res[Y]*((j + 0.5) / c.res[Y]);
             Point3D p = c.position - d * c.forward + u * c.right + v * c.up;
-            Dir3D rayDir = (p - c.position);
-            Line3D rayLine = vee(c.position, rayDir).normalized();
-            // intersection = FindIntersection(eye, rayLine, scene);
-            // diff = intersection - sphere_center
-            // sphere_normal = diff.normalized()
-            //outputImg.setPixel(i, j, color);
+            Dir3D rayDir = (p - c.position).normalized();
+               
+            HitInformation hit_info;
+            bool temp = FindIntersection(geometry, Ray(c.position, rayDir), &hit_info);
+
+            if (temp) outputImg.setPixel(i, j, Color(1, 1, 1));
         }
     }
 
     outputImg.write(output_name);
+
+    int im_x, im_y;
+    bool ret = LoadTextureFromFile(output_name, &disp_img_tex, &im_x, &im_y);
+    disp_img_size = ImVec2(im_x, im_y);
+    IM_ASSERT(ret);
+}
+
+
+bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection) {
+    HitInformation current_inter;
+    float dist = -1.0;
+    for (Geometry* geo : geometry) {
+        if (geo->FindIntersection(ray, current_inter)) {
+            if (dist == -1.0 || current_inter.dist < dist) {
+                *intersection = current_inter;
+                dist = current_inter.dist;
+            }
+        }
+    }
+    return dist != -1.0;
 }
 
 
@@ -553,7 +635,8 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_wid
 
     return true;
 }
-}
+
+} //  namespace P3
 
 using namespace P3;
 
@@ -577,7 +660,7 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Project 3, Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 2560, 720, window_flags);
+    SDL_Window* window = SDL_CreateWindow("Project 3, Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1); // Enable vsync
@@ -603,6 +686,11 @@ int main(int argc, char** argv) {
 
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    int im_x, im_y;
+    bool ret = LoadTextureFromFile("smile.png", &disp_img_tex, &im_x, &im_y);
+    disp_img_size = ImVec2(im_x, im_y);
+    IM_ASSERT(ret);
 
     // Main loop
     bool done = false;
@@ -681,13 +769,7 @@ int main(int argc, char** argv) {
 
 
         ImGui::Begin("Output");
-        int im_h = 0, im_w = 0;
-        GLuint im_tex = 0;
-
-        bool ret = LoadTextureFromFile("smile.png", &im_tex, &im_w, &im_h);
-        IM_ASSERT(ret);
-
-        ImGui::Image((void*)(intptr_t)im_tex, ImVec2(im_w, im_h));
+        ImGui::Image((void*)(intptr_t)disp_img_tex, disp_img_size);
         ImGui::End();
 
 

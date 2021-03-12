@@ -26,8 +26,15 @@ using std::stringstream;
 
 #include <glad/glad.h>          // Initialize with gladLoadGL()
 
+#define X 0
+#define Y 1
+
 
 namespace P3 {
+
+struct Geometry;
+struct Sphere;
+struct Material;
 
 // This function is used as a helper to parse the keyed lines
 // Pseudo: if prefix_matches ? string_without_prefix : "";
@@ -94,6 +101,8 @@ struct UIGeometry : UIObject {
     vector<UIGeometry*>::iterator GetIter();
     void Delete();
 
+    virtual Geometry* ToGeometry();
+
     void ImGui();
     string Encode();
     void Decode(string s);
@@ -104,6 +113,8 @@ struct UISphere : UIGeometry {
     float rad = 1.0f;
 
     using UIGeometry::UIGeometry;
+
+    Geometry* ToGeometry();
 
     void ImGui();
     string Encode();
@@ -166,23 +177,64 @@ struct UISpotLight : UILight {
 };
 
 
+struct HitInformation {
+    float dist;
+    Point3D pos;
+    Dir3D viewing;
+    Dir3D normal;
+};
+
+
+struct Ray {
+    Point3D pos;
+    Dir3D dir;
+
+    Ray(Point3D p, Dir3D d) : pos(p), dir(d.normalized()) { }
+};
+
+
 struct Camera {
     Point3D position;
-    Dir3D forward, up;
+    Dir3D forward, up, right;
     Color background_color;
     float half_vfov;
-    array<int> resolution;
+    array<int, 2> res;
+    array<int, 2> mid_res;
     int max_depth = 5;
 
     Camera(UICamera* from);
 };
 
+struct Material {
+    Color ambient = Color();
+    Color diffuse = Color();
+    Color specular = Color();
+    Color transmissive = Color();
+    float phong = 0.0f;
+    float ior = 0.0f;
 
-struct HitInformation {
-    float viewing;
-    float pos;
-    float normal;
+    Material() { }
+    Material(UIMaterial* from);
 };
+
+struct Geometry {
+    Material material; // We no longer care about pointers because at this point material is just constant values.
+
+    Geometry(UIGeometry* from);
+
+    virtual bool FindIntersection(Ray ray, HitInformation& intersection) { return false; }
+};
+
+
+struct Sphere : Geometry {
+    Point3D position;
+    float radius;
+
+    Sphere(UISphere* from);
+
+    bool FindIntersection(Ray ray, HitInformation* intersection);
+};
+
 
 
 void Reset();
@@ -191,5 +243,7 @@ void Save();
 void Render();
 
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
+
+bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 
 }
