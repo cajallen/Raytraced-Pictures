@@ -8,6 +8,7 @@
 #include <SDL.h>
 #include <string>
 #include <vector>
+#include <array>
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -16,6 +17,7 @@
 
 using std::string;
 using std::vector;
+using std::array;
 using std::cout;
 using std::endl;
 using std::ifstream;
@@ -161,6 +163,18 @@ struct UISpotLight : UILight {
     void ImGui();
     string Encode();
     void Decode(string s);
+};
+
+
+struct Camera {
+    Point3D position;
+    Dir3D forward, up;
+    Color background_color;
+    float half_vfov;
+    array<int> resolution;
+    int max_depth = 5;
+
+    Camera(UICamera* from);
 };
 
 

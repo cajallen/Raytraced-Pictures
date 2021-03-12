@@ -10,11 +10,12 @@
 
 namespace P3 {
 
+
 // GLOBAL STATE
-vector<UIGeometry*> shapes{};
-vector<UILight*> lights{};
-vector<UIMaterial*> materials{ new UIMaterial() };
-UICamera* camera = new UICamera();
+vector<UIGeometry*> ui_shapes{};
+vector<UILight*> ui_lights{};
+vector<UIMaterial*> ui_materials{ new UIMaterial() };
+UICamera* ui_camera = new UICamera();
 int entity_count = 0;
 char scene_name[256] = "";
 
@@ -47,39 +48,39 @@ string UIObject::WithId(string s) {
 }
 
 
-// Call without index to create new shapes
+// Call without index to create new ui_shapes
 UIGeometry::UIGeometry() : UIObject() {
-    mat = materials.back();
+    mat = ui_materials.back();
 }
-// Call with index to replace shapes (use old id)
+// Call with index to replace ui_shapes (use old id)
 UIGeometry::UIGeometry(int old_id) : UIObject(old_id) {
-    mat = materials.back();
+    mat = ui_materials.back();
 }
 
 
-void UIGeometry::Delete() { shapes.erase(GetIter()); }
-void UILight::Delete() { lights.erase(GetIter()); }
+void UIGeometry::Delete() { ui_shapes.erase(GetIter()); }
+void UILight::Delete() { ui_lights.erase(GetIter()); }
 
 
 vector<UIGeometry*>::iterator UIGeometry::GetIter() {
-    for (vector<UIGeometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
+    for (vector<UIGeometry*>::iterator it = ui_shapes.begin(); it < ui_shapes.end(); it++) {
         if ((*it)->id == id) {
             return it;
         }
     }
-    cout << "Geometry not found in shapes" << endl;
-    return shapes.end();
+    cout << "Geometry not found in ui_shapes" << endl;
+    return ui_shapes.end();
 }
 
 
 vector<UILight*>::iterator UILight::GetIter() {
-    for (vector<UILight*>::iterator it = lights.begin(); it < lights.end(); it++) {
+    for (vector<UILight*>::iterator it = ui_lights.begin(); it < ui_lights.end(); it++) {
         if ((*it)->id == id) {
             return it;
         }
     }
-    cout << "Light not found in lights" << endl;
-    return lights.end();
+    cout << "Light not found in ui_lights" << endl;
+    return ui_lights.end();
 }
 
 
@@ -367,27 +368,41 @@ string UISpotLight::Encode() {
     return ss.str();
 }
 
+Camera::Camera(UICamera* from) {
+    position = Point3D(from->cp[0], from->cp[1], from->cp[2]);
+    background_color = Color(from->bc[0], from->bc[1], from->bc[2]);
+    half_vfov = from->fov_ha;
+    res = {from->window_res[0], from->window_res[1]};
+    mid_res = { res[0]/2.0, res[1]/2.0 };
+    max_depth = from->max_depth;
+
+    forward = Dir3D(from->cf[0], from->cf[1], from->cf[2]).normalized();
+    up = Dir3D(from->cu[0], from->cu[1], from->cu[2]);
+    right = cross(up, forward).normalized();
+    up = cross(forward, up).normalized();
+}
+
 
 void Reset() {
-    delete camera;
-    for (UIGeometry* o : shapes) {
+    delete ui_camera;
+    for (UIGeometry* o : ui_shapes) {
         delete o;
     }
-    for (UILight* o : lights) {
+    for (UILight* o : ui_lights) {
         delete o;
     }
-    for (UIMaterial* o : materials) {
+    for (UIMaterial* o : ui_materials) {
         delete o;
     }
-    shapes.clear();
-    lights.clear();
-    materials.clear();
+    ui_shapes.clear();
+    ui_lights.clear();
+    ui_materials.clear();
 
     strcpy(output_name, "");
 
     entity_count = 0;
-    materials.push_back(new UIMaterial());
-    camera = new UICamera();
+    ui_materials.push_back(new UIMaterial());
+    ui_camera = new UICamera();
 }
 
 
@@ -409,48 +424,48 @@ void Load() {
     while (getline(scene_file, line)) {
         string rest;
 
-        camera->Decode(line);
+        ui_camera->Decode(line);
 
         rest = rest_if_prefix("sphere: ", line);
         if (rest != "") {
             UISphere* new_sphere = new UISphere();
             new_sphere->Decode(rest);
-            shapes.push_back(new_sphere);
+            ui_shapes.push_back(new_sphere);
         }
 
         rest = rest_if_prefix("material: ", line);
         if (rest != "") {
             UIMaterial* new_mat = new UIMaterial();
             new_mat->Decode(rest);
-            materials.push_back(new_mat);
+            ui_materials.push_back(new_mat);
         }
 
         rest = rest_if_prefix("ambient_light: ", line);
         if (rest != "") {
             UIAmbientLight* new_light = new UIAmbientLight();
             new_light->Decode(rest);
-            lights.push_back(new_light);
+            ui_lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("directional_light: ", line);
         if (rest != "") {
             UIDirectionalLight* new_light = new UIDirectionalLight();
             new_light->Decode(rest);
-            lights.push_back(new_light);
+            ui_lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("point_light: ", line);
         if (rest != "") {
             UIPointLight* new_light = new UIPointLight();
             new_light->Decode(rest);
-            lights.push_back(new_light);
+            ui_lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("spot_light: ", line);
         if (rest != "") {
             UISpotLight* new_light = new UISpotLight();
             new_light->Decode(rest);
-            lights.push_back(new_light);
+            ui_lights.push_back(new_light);
         }
     }
     scene_file.close();
@@ -467,13 +482,13 @@ void Save() {
     ofstream scene_file(scene_string);
     if (!scene_file.is_open()) { return; }
 
-    scene_file << camera->Encode() << endl;
+    scene_file << ui_camera->Encode() << endl;
 
-    for (UIGeometry* geo : shapes) {
+    for (UIGeometry* geo : ui_shapes) {
         scene_file << geo->Encode() << endl;
     }
 
-    for (UILight* light : lights) {
+    for (UILight* light : ui_lights) {
         scene_file << light->Encode() << endl;
     }
 
@@ -482,25 +497,18 @@ void Save() {
 
 
 void Render() {
-    Point3D eye = Point3D(camera->cp[0], camera->cp[1], camera->cp[2]);
-    Dir3D forward = Dir3D(camera->cf[0], camera->cf[1], camera->cf[2]).normalized();
-    Dir3D up = Dir3D(cu[0], cu[1], cu[2]);
-    Dir3D right = cross(up, forward).normalized();
-    up = cross(forward, up).normalized();
+    Camera c = Camera(ui_camera);
 
-    int imgW = window_res[0];
-    int imgH = window_res[1];
-    float halfW = imgW / 2.0, halfH = imgH / 2.0;
-    float d = halfH / tanf(fov_ha * (M_PI / 180.0f));
+    float d = c.mid_res[Y] / tanf(c.half_vfov * (M_PI / 180.0f));
 
-    Image outputImg = Image(imgW, imgH);
-    for (int i = 0; i < imgW; i++) {
-        for (int j = 0; j < imgH; j++) {
-            float u = (halfW - (window_res[0]) * ((i + 0.5) / imgW));
-            float v = (halfH - (window_res[1]) * ((j + 0.5) / imgH));
-            Point3D p = eye - d * forward + u * right + v * up;
-            Dir3D rayDir = (p - eye);
-            Line3D rayLine = vee(eye, rayDir).normalized();
+    Image outputImg = Image(c.res[X], c.res[Y]);
+    for (int i = 0; i < c.res[X]; i++) {
+        for (int j = 0; j < c.res[Y]; j++) {
+            float u = (c.mid_res[X] - (c.res[X]) * ((i + 0.5) / c.res[X]));
+            float v = (c.mid_res[Y] - (c.res[Y]) * ((j + 0.5) / c.res[Y]));
+            Point3D p = c.position - d * c.forward + u * c.right + v * c.up;
+            Dir3D rayDir = (p - c.position);
+            Line3D rayLine = vee(c.position, rayDir).normalized();
             // intersection = FindIntersection(eye, rayLine, scene);
             // diff = intersection - sphere_center
             // sphere_normal = diff.normalized()
@@ -633,16 +641,16 @@ int main(int argc, char** argv) {
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
-        camera->ImGui();
+        ui_camera->ImGui();
         ImGui::PopStyleColor(2);
         
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 0.7, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Geometry")) {
-            for (UIGeometry* shape : shapes) {
+            for (UIGeometry* shape : ui_shapes) {
                 shape->ImGui();
             }
             if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth(), 0))) {
-                shapes.push_back(new UISphere());
+                ui_shapes.push_back(new UISphere());
             }
         }
         ImGui::PopStyleColor();
@@ -650,23 +658,23 @@ int main(int argc, char** argv) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Lighting")) {
             float spacing = 4.0f;
-            for (UILight* light : lights) {
+            for (UILight* light : ui_lights) {
                 light->ImGui();
             }
             if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new UIAmbientLight());
+                ui_lights.push_back(new UIAmbientLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new UIPointLight());
+                ui_lights.push_back(new UIPointLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new UISpotLight());
+                ui_lights.push_back(new UISpotLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                lights.push_back(new UIDirectionalLight());
+                ui_lights.push_back(new UIDirectionalLight());
             }
         }
         ImGui::PopStyleColor();
@@ -696,15 +704,15 @@ int main(int argc, char** argv) {
         SDL_GL_SwapWindow(window);
     }
 
-    for (UIGeometry* geo : shapes) {
+    for (UIGeometry* geo : ui_shapes) {
         delete geo;
     }
 
-    for (UILight* light : lights) {
+    for (UILight* light : ui_lights) {
         delete light;
     }
 
-    for (UIMaterial* mat : materials) {
+    for (UIMaterial* mat : ui_materials) {
         delete mat;
     }
 
