@@ -20,7 +20,7 @@ int entity_count = 0;
 char scene_name[256] = "";
 
 ImVec2 disp_img_size{ 0.0, 0.0 };
-GLuint disp_img_tex = 0;
+GLuint disp_img_tex = -1;
 
 // OTHER SETTINGS
 char output_name[256] = "raytraced.bmp";
@@ -578,10 +578,11 @@ void Render() {
         }
     }
 
-    outputImg.write(output_name);
+    string relative_output_name = "output/" + string(output_name);
+    outputImg.write(relative_output_name.c_str());
 
     int im_x, im_y;
-    bool ret = LoadTextureFromFile(output_name, &disp_img_tex, &im_x, &im_y);
+    bool ret = LoadTextureFromFile(relative_output_name.c_str(), &disp_img_tex, &im_x, &im_y);
     disp_img_size = ImVec2(im_x, im_y);
     IM_ASSERT(ret);
 }
@@ -687,11 +688,6 @@ int main(int argc, char** argv) {
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    int im_x, im_y;
-    bool ret = LoadTextureFromFile("smile.png", &disp_img_tex, &im_x, &im_y);
-    disp_img_size = ImVec2(im_x, im_y);
-    IM_ASSERT(ret);
-
     // Main loop
     bool done = false;
     while (!done) {
@@ -767,10 +763,11 @@ int main(int argc, char** argv) {
         }
         ImGui::PopStyleColor();
 
-
-        ImGui::Begin("Output");
-        ImGui::Image((void*)(intptr_t)disp_img_tex, disp_img_size);
-        ImGui::End();
+        if (disp_img_tex != -1) {
+            ImGui::Begin("Output");
+            ImGui::Image((void*)(intptr_t)disp_img_tex, disp_img_size);
+            ImGui::End();
+        }
 
 
 
