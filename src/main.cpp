@@ -41,6 +41,19 @@ string rest_if_prefix(const string prefix, string content) {
 }
 
 
+Ray Reflect(HitInformation hit) {
+    Dir3D to_in = -hit.viewing;
+
+    Line3D normal_dir = vee(Point3D(0, 0, 0), hit.normal).normalized();
+    Point3D in_proj = proj(Point3D(to_in.x, to_in.y, to_in.z), normal_dir);
+    Point3D in_refl = (in_proj - to_in).normalized();
+
+    Point3D from = hit.pos + hit.normal * 100 * FLT_EPSILON;
+
+    return Ray(from, Dir3D(in_refl.x, in_refl.y, in_refl.z));
+}
+
+
 UIObject::UIObject() {
     id = entity_count;
     entity_count++;
@@ -648,7 +661,7 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
 
     for (Light* light : lights) {
         Ray to_light = light->ReverseLightRay(hit_info.pos);
-        to_light.pos = to_light.pos + hit_info.normal * max(hit_info.dist, 1) * 20 * FLT_EPSILON;
+        to_light.pos = to_light.pos + hit_info.normal * 100 * FLT_EPSILON;
         HitInformation light_intersection;
         // If light is blocked
         if (FindIntersection(geometry, to_light, &light_intersection) && light_intersection.dist < light->DistanceTo(hit_info.pos)) continue;
@@ -656,16 +669,21 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
         current = current + CalculateDiffuse(light, hit_info);
         current = current + CalculateSpecular(light, hit_info);
     }
-
-    current = current + CalculateAmbient();
+    Ray test = Reflect(hit_info);
+    test.bounces_left = ray.bounces_left - 1;
+    current = current + hit_info.material.specular * EvaluateRay(test);
+    current = current + CalculateAmbient(hit_info);
 
     return current;
 }
 
 
 Color EvaluateRay(Ray ray) {
+    if (ray.bounces_left <= 0) return camera->background_color;
+
     HitInformation hit_info;
     if (FindIntersection(geometry, ray, &hit_info)) {
+        return Color(hit_info.normal.x * 0.5 + 0.5, hit_info.normal.y * 0.5 + 0.5, hit_info.normal.z * 0.5 + 0.5);
         return ApplyLighting(ray, hit_info);
     }
     else {
@@ -677,11 +695,7 @@ Color CalculateDiffuse(Light* light, HitInformation hit) {
     Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
     float amount = max(0, dot(hit.normal, to_light));
     Color il = light->Intensity(hit.pos);
-    float r = hit.hit_material.diffuse.r * il.r * amount;
-    float g = hit.hit_material.diffuse.g * il.g * amount;
-    float b = hit.hit_material.diffuse.b * il.b * amount;
-
-    return Color(r, g, b);
+    return hit.material.diffuse * il * amount;
 }
 
 Color CalculateSpecular(Light* light, HitInformation hit) {
@@ -691,22 +705,18 @@ Color CalculateSpecular(Light* light, HitInformation hit) {
     Point3D tl_projected = proj(Point3D(to_light.x, to_light.y, to_light.z), normal_line);
     Point3D tl_reflected = (tl_projected - to_light).normalized();
     Dir3D tlr_dir = Dir3D(tl_reflected.x, tl_reflected.y, tl_reflected.z);
-    float amount = pow(max(0, dot(tlr_dir, to_viewer)), 4);
+    float amount = pow(max(0, dot(tlr_dir, to_viewer)), hit.material.phong);
 
     Color il = light->Intensity(hit.pos);
 
-    float r = hit.hit_material.specular.r * il.r * amount;
-    float g = hit.hit_material.specular.g * il.g * amount;
-    float b = hit.hit_material.specular.b * il.b * amount;
-
-    return Color(r, g, b);
+    return hit.material.specular * il * amount;
 }
 
-Color CalculateAmbient() {
+Color CalculateAmbient(HitInformation hit) {
     Color c = Color(0, 0, 0);
 
     for (AmbientLight* al : ambient) {
-        c = c + al->color;
+        c = c + hit.material.diffuse * al->color;
     }
     return c;
 }
@@ -740,7 +750,9 @@ void Render() {
             Point3D p = camera->position - d * camera->forward + u * camera->right + v * camera->up;
             Dir3D rayDir = (p - camera->position).normalized();
 
-            Color col = EvaluateRay(Ray(camera->position, rayDir));
+            Ray ray = Ray(camera->position, rayDir);
+            ray.bounces_left = camera->max_depth;
+            Color col = EvaluateRay(ray);
 
             outputImg.setPixel(i, j, col);
         }

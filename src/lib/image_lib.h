@@ -15,6 +15,12 @@ struct Color{
   Color operator+(const Color& rhs) const {
       return Color(r + rhs.r, g + rhs.g, b + rhs.b);
   }
+  Color operator*(const Color& rhs) const {
+      return Color(r * rhs.r, g * rhs.g, b * rhs.b);
+  }
+  Color operator*(const float& rhs) const {
+      return Color(r * rhs, g * rhs, b * rhs);
+  }
 };
 
 struct Image{

@@ -206,19 +206,23 @@ struct HitInformation {
     Dir3D viewing;
     Dir3D normal;
 
-    Material hit_material;
+    Material material;
 };
-
-Color CalculateDiffuse(Light* light, HitInformation hit);
-Color CalculateSpecular(Light* light, HitInformation hit);
-Color CalculateAmbient();
 
 struct Ray {
     Point3D pos;
     Dir3D dir;
+    int bounces_left;
 
     Ray(Point3D p, Dir3D d) : pos(p), dir(d.normalized()) { }
 };
+
+Ray Reflect(HitInformation hit);
+Color EvaluateRay(Ray ray);
+Color CalculateDiffuse(Light* light, HitInformation hit);
+Color CalculateSpecular(Light* light, HitInformation hit);
+Color CalculateAmbient(HitInformation hit);
+
 
 
 struct Camera {
