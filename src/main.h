@@ -222,7 +222,7 @@ struct Geometry {
 
     Geometry(UIGeometry* from);
 
-    virtual bool FindIntersection(Ray ray, HitInformation& intersection) { return false; }
+    virtual bool FindIntersection(Ray ray, HitInformation* intersection) { return false; }
 };
 
 

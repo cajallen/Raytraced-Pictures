@@ -392,7 +392,7 @@ Camera::Camera(UICamera* from) {
     forward = Dir3D(from->cf[0], from->cf[1], from->cf[2]).normalized();
     up = Dir3D(from->cu[0], from->cu[1], from->cu[2]);
     right = cross(up, forward).normalized();
-    up = cross(forward, up).normalized();
+    up = cross(forward, right).normalized();
 }
 
 
@@ -428,7 +428,7 @@ bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
     float t0 = (-b + sqrt(discr)) / 2;
     float t1 = (-b - sqrt(discr)) / 2;
     float mint = t0;
-    if (t1 > 0.0 && t1 > t0) mint = t1;
+    if (t1 > 0.0 && t1 < t0) mint = t1;
 
     if (mint < 0.0) return false;
 
@@ -481,6 +481,7 @@ void Load() {
     while (getline(scene_file, line)) {
         string rest;
 
+        // TODO: Should this be the syntax for all Decode calls?
         ui_camera->Decode(line);
 
         rest = rest_if_prefix("sphere: ", line);
@@ -574,7 +575,7 @@ void Render() {
             HitInformation hit_info;
             bool temp = FindIntersection(geometry, Ray(c.position, rayDir), &hit_info);
 
-            if (temp) outputImg.setPixel(i, j, Color(1, 1, 1));
+            if (temp) outputImg.setPixel(i, j, Color(hit_info.dist, hit_info.dist, hit_info.dist));
         }
     }
 
@@ -585,6 +586,10 @@ void Render() {
     bool ret = LoadTextureFromFile(relative_output_name.c_str(), &disp_img_tex, &im_x, &im_y);
     disp_img_size = ImVec2(im_x, im_y);
     IM_ASSERT(ret);
+
+    for (Geometry* geo : geometry) {
+        delete geo;
+    }
 }
 
 
@@ -592,7 +597,7 @@ bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* inter
     HitInformation current_inter;
     float dist = -1.0;
     for (Geometry* geo : geometry) {
-        if (geo->FindIntersection(ray, current_inter)) {
+        if (geo->FindIntersection(ray, &current_inter)) {
             if (dist == -1.0 || current_inter.dist < dist) {
                 *intersection = current_inter;
                 dist = current_inter.dist;
