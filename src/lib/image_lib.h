@@ -11,6 +11,10 @@ struct Color{
 
   Color(float r, float g, float b) : r(r), g(g), b(b) {}
   Color() : r(0), g(0), b(0) {}
+
+  Color operator+(const Color& rhs) const {
+      return Color(r + rhs.r, g + rhs.g, b + rhs.b);
+  }
 };
 
 struct Image{

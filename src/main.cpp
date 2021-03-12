@@ -11,7 +11,9 @@
 namespace P3 {
 
 
-// GLOBAL STATE
+char output_name[256] = "raytraced.bmp";
+
+// UI STATE
 vector<UIGeometry*> ui_shapes{};
 vector<UILight*> ui_lights{};
 vector<UIMaterial*> ui_materials{ new UIMaterial() };
@@ -22,8 +24,11 @@ char scene_name[256] = "";
 ImVec2 disp_img_size{ 0.0, 0.0 };
 GLuint disp_img_tex = -1;
 
-// OTHER SETTINGS
-char output_name[256] = "raytraced.bmp";
+// RENDER STATE
+Camera* camera;
+vector<Geometry*> geometry;
+vector<Light*> lights;
+vector<AmbientLight*> ambient;
 
 
 string rest_if_prefix(const string prefix, string content) {
@@ -149,6 +154,7 @@ void UIMaterial::ImGui() {
 void UILight::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Light ").c_str())) {
         ImGui::Indent(4.0f);
+        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -160,6 +166,7 @@ void UILight::ImGui() {
 void UIAmbientLight::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
         ImGui::Indent(4.0f);
+        ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
@@ -171,7 +178,8 @@ void UIAmbientLight::ImGui() {
 void UIPointLight::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::InputFloat3(WithId("pos##").c_str(), pos);
+        ImGui::DragFloat3(WithId("pos##").c_str(), pos);
+        ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
@@ -194,6 +202,8 @@ void UISpotLight::ImGui() {
 void UIDirectionalLight::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
         ImGui::Indent(4.0f);
+        ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
+        ImGui::DragFloat3(WithId("direction##").c_str(), dir, 0.01, -1.0, 1.0);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
@@ -203,7 +213,7 @@ void UIDirectionalLight::ImGui() {
 }
 
 
-void UICamera::Decode(string s) {
+void UICamera::Decode(string& s) {
     string rest;
     rest = rest_if_prefix("camera_pos: ", s);
     if (rest != "") {
@@ -255,7 +265,7 @@ void UICamera::Decode(string s) {
 }
 
 
-void UIMaterial::Decode(string s) {
+void UIMaterial::Decode(string& s) {
     stringstream ss(s);
     ss >> ambient[0] >> ambient[1] >> ambient[2] >>
         diffuse[0] >> diffuse[1] >> diffuse[2] >>
@@ -263,38 +273,49 @@ void UIMaterial::Decode(string s) {
         transmissive[0] >> transmissive[1] >> transmissive[2] >> ior;
 }
 
-void UIGeometry::Decode(string s) {
+void UIGeometry::Decode(string& s) {
 }
 
 
-void UISphere::Decode(string s) {
+void UISphere::Decode(string& s) {
     stringstream ss(s);
     ss >> pos[0] >> pos[1] >> pos[2] >> rad;
 }
 
-void UILight::Decode(string s) {
+void UILight::Decode(string& s) {
     stringstream ss(s);
     ss >> col[0] >> col[1] >> col[2];
+    if (col[0] > 1 || col[1] > 1 || col[2] > 1) {
+        float max_col = max(col[0], max(col[1], col[2]));
+        mult = max_col;
+        col[0] /= mult;
+        col[1] /= mult;
+        col[2] /= mult;
+    }
+
+    getline(ss, s);
 }
 
-void UIAmbientLight::Decode(string s) {
-    stringstream ss(s);
-    ss >> col[0] >> col[1] >> col[2];
+void UIAmbientLight::Decode(string& s) {
+    UILight::Decode(s);
 }
 
-void UIPointLight::Decode(string s) {
+void UIPointLight::Decode(string& s) {
+    UILight::Decode(s);
     stringstream ss(s);
-    ss >> col[0] >> col[1] >> col[2] >> pos[0] >> pos[1] >> pos[2];
+    ss >> pos[0] >> pos[1] >> pos[2];
 }
 
-void UIDirectionalLight::Decode(string s) {
+void UIDirectionalLight::Decode(string& s) {
+    UILight::Decode(s);
     stringstream ss(s);
-    ss >> col[0] >> col[1] >> col[2] >> dir[0] >> dir[1] >> dir[2];
+    ss >> dir[0] >> dir[1] >> dir[2];
 }
 
-void UISpotLight::Decode(string s) {
+void UISpotLight::Decode(string& s) {
+    UILight::Decode(s);
     stringstream ss(s);
-    ss >> col[0] >> col[1] >> col[2] >> pos[0] >> pos[1] >> pos[2] >> dir[0] >> dir[1] >> dir[2] >> angle1 >> angle2;
+    ss >> pos[0] >> pos[1] >> pos[2] >> dir[0] >> dir[1] >> dir[2] >> angle1 >> angle2;
 }
 
 
@@ -338,7 +359,7 @@ string UISphere::Encode() {
 
 string UILight::Encode() {
     char temp[256];
-    sprintf(temp, "%f %f %f", col[0], col[1], col[2]);
+    sprintf(temp, "%f %f %f", col[0] * mult, col[1] * mult, col[2] * mult);
 
     return string(temp);
 }
@@ -381,6 +402,26 @@ Geometry* UISphere::ToGeometry() {
 }
 
 
+Light* UILight::ToLight() {
+    return new Light(this);
+}
+
+
+Light* UIAmbientLight::ToLight() {
+    return new AmbientLight(this);
+}
+
+
+Light* UIDirectionalLight::ToLight() {
+    return new DirectionalLight(this);
+}
+
+
+Light* UIPointLight::ToLight() {
+    return new PointLight(this);
+}
+
+
 Camera::Camera(UICamera* from) {
     position = Point3D(from->cp[0], from->cp[1], from->cp[2]);
     background_color = Color(from->bc[0], from->bc[1], from->bc[2]);
@@ -417,6 +458,22 @@ Sphere::Sphere(UISphere* from) : Geometry(from) {
 }
 
 
+Light::Light(UILight* from) {
+    float m = from->mult;
+    color = Color(from->col[0] * m, from->col[1] * m, from->col[2] * m);
+}
+
+DirectionalLight::DirectionalLight(UIDirectionalLight* from) : Light(from) {
+    direction = Dir3D(from->dir[0], from->dir[1], from->dir[2]);
+}
+
+PointLight::PointLight(UIPointLight* from) : Light(from) {
+    position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
+}
+
+
+
+
 bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
     Dir3D toStart = (ray.pos - position);
     float b = 2 * dot(ray.dir, toStart);
@@ -434,9 +491,46 @@ bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
 
     Point3D hit_pos = ray.pos + mint * ray.dir;
     Dir3D hit_norm = (hit_pos - position).normalized();
-    *intersection = HitInformation{ mint, hit_pos, ray.dir, hit_norm };
+    *intersection = HitInformation{ mint, hit_pos, ray.dir, hit_norm, material };
     
     return true;
+}
+
+
+Ray DirectionalLight::ReverseLightRay(Point3D from) {
+    return Ray{ from, -direction };
+}
+
+
+Ray PointLight::ReverseLightRay(Point3D from) {
+    Dir3D offset = position - from;
+
+    return Ray{ from, offset.normalized() };
+}
+
+
+float DirectionalLight::DistanceTo(Point3D to) {
+    return INFINITY;
+}
+
+float PointLight::DistanceTo(Point3D to) {
+    Dir3D offset = to - position;
+    return offset.magnitude();
+}
+
+
+Color DirectionalLight::Intensity(Point3D to) {
+    return color;
+}
+
+
+Color PointLight::Intensity(Point3D to) {
+    float dist2 = pow(DistanceTo(to), 2);
+    float r = color.r / dist2;
+    float g = color.g / dist2;
+    float b = color.b / dist2;
+
+    return Color(r,g,b);
 }
 
 
@@ -466,22 +560,17 @@ void Reset() {
 void Load() {
     Reset();
 
-    if (string(scene_name) == "") {
-        return;
-    }
-
     string scene_string = "scenes/" + string(scene_name) + ".p3";
 
-
-
     ifstream scene_file(scene_string);
-    if (!scene_file.is_open()) { return; }
+    if (!scene_file.is_open()) return;
 
     string line;
     while (getline(scene_file, line)) {
         string rest;
 
         // TODO: Should this be the syntax for all Decode calls?
+        // Probably lol...
         ui_camera->Decode(line);
 
         rest = rest_if_prefix("sphere: ", line);
@@ -554,42 +643,127 @@ void Save() {
 }
 
 
+Color ApplyLighting(Ray ray, HitInformation hit_info) {
+    Color current(0, 0, 0);
+
+    for (Light* light : lights) {
+        Ray to_light = light->ReverseLightRay(hit_info.pos);
+        to_light.pos = to_light.pos + hit_info.normal * max(hit_info.dist, 1) * 20 * FLT_EPSILON;
+        HitInformation light_intersection;
+        // If light is blocked
+        if (FindIntersection(geometry, to_light, &light_intersection) && light_intersection.dist < light->DistanceTo(hit_info.pos)) continue;
+
+        current = current + CalculateDiffuse(light, hit_info);
+        current = current + CalculateSpecular(light, hit_info);
+    }
+
+    current = current + CalculateAmbient();
+
+    return current;
+}
+
+
+Color EvaluateRay(Ray ray) {
+    HitInformation hit_info;
+    if (FindIntersection(geometry, ray, &hit_info)) {
+        return ApplyLighting(ray, hit_info);
+    }
+    else {
+        return camera->background_color;
+    }
+}
+
+Color CalculateDiffuse(Light* light, HitInformation hit) {
+    Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
+    float amount = max(0, dot(hit.normal, to_light));
+    Color il = light->Intensity(hit.pos);
+    float r = hit.hit_material.diffuse.r * il.r * amount;
+    float g = hit.hit_material.diffuse.g * il.g * amount;
+    float b = hit.hit_material.diffuse.b * il.b * amount;
+
+    return Color(r, g, b);
+}
+
+Color CalculateSpecular(Light* light, HitInformation hit) {
+    Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
+    Dir3D to_viewer = -hit.viewing;
+    Line3D normal_line = vee(Point3D(0, 0, 0), hit.normal).normalized();
+    Point3D tl_projected = proj(Point3D(to_light.x, to_light.y, to_light.z), normal_line);
+    Point3D tl_reflected = (tl_projected - to_light).normalized();
+    Dir3D tlr_dir = Dir3D(tl_reflected.x, tl_reflected.y, tl_reflected.z);
+    float amount = pow(max(0, dot(tlr_dir, to_viewer)), 4);
+
+    Color il = light->Intensity(hit.pos);
+
+    float r = hit.hit_material.specular.r * il.r * amount;
+    float g = hit.hit_material.specular.g * il.g * amount;
+    float b = hit.hit_material.specular.b * il.b * amount;
+
+    return Color(r, g, b);
+}
+
+Color CalculateAmbient() {
+    Color c = Color(0, 0, 0);
+
+    for (AmbientLight* al : ambient) {
+        c = c + al->color;
+    }
+    return c;
+}
+
+
 void Render() {
-    Camera c = Camera(ui_camera);
+    camera = new Camera(ui_camera);
 
-    float d = c.mid_res[Y] / tanf(c.half_vfov * (M_PI / 180.0f));
+    float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
 
-    vector<Geometry*> geometry;
     for (UIGeometry* geo : ui_shapes) {
         geometry.push_back(geo->ToGeometry());
     }
 
-    Image outputImg = Image(c.res[X], c.res[Y]);
-    for (int i = 0; i < c.res[X]; i++) {
-        for (int j = 0; j < c.res[Y]; j++) {
-            float u = c.mid_res[X] - c.res[X]*((i + 0.5) / c.res[X]);
-            float v = c.mid_res[Y] - c.res[Y]*((j + 0.5) / c.res[Y]);
-            Point3D p = c.position - d * c.forward + u * c.right + v * c.up;
-            Dir3D rayDir = (p - c.position).normalized();
-               
-            HitInformation hit_info;
-            bool temp = FindIntersection(geometry, Ray(c.position, rayDir), &hit_info);
+    for (UILight* light : ui_lights) {
+        Light* l = light->ToLight();
+        AmbientLight* al = dynamic_cast<AmbientLight*>(l);
+        if (al == NULL) {
+            lights.push_back(l);
+        }
+        else {
+            ambient.push_back(al);
+        }
+    }
 
-            if (temp) outputImg.setPixel(i, j, Color(hit_info.dist, hit_info.dist, hit_info.dist));
+    Image outputImg = Image(camera->res[X], camera->res[Y]);
+    for (int i = 0; i < camera->res[X]; i++) {
+        for (int j = 0; j < camera->res[Y]; j++) {
+            float u = camera->mid_res[X] - camera->res[X]*((i + 0.5) / camera->res[X]);
+            float v = camera->mid_res[Y] - camera->res[Y]*((j + 0.5) / camera->res[Y]);
+            Point3D p = camera->position - d * camera->forward + u * camera->right + v * camera->up;
+            Dir3D rayDir = (p - camera->position).normalized();
+
+            Color col = EvaluateRay(Ray(camera->position, rayDir));
+
+            outputImg.setPixel(i, j, col);
         }
     }
 
     string relative_output_name = "output/" + string(output_name);
     outputImg.write(relative_output_name.c_str());
+    DisplayImage(relative_output_name);
 
-    int im_x, im_y;
-    bool ret = LoadTextureFromFile(relative_output_name.c_str(), &disp_img_tex, &im_x, &im_y);
-    disp_img_size = ImVec2(im_x, im_y);
-    IM_ASSERT(ret);
-
+    delete camera;
     for (Geometry* geo : geometry) {
         delete geo;
     }
+    for (Light* light : lights) {
+        delete light;
+    }
+    for (AmbientLight* light : ambient) {
+        delete light;
+    }
+    geometry.clear();
+    lights.clear();
+    ambient.clear();
+
 }
 
 
@@ -640,6 +814,13 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_wid
     *out_height = image_height;
 
     return true;
+}
+
+void DisplayImage(string name) {
+    int im_x, im_y;
+    bool ret = LoadTextureFromFile(name.c_str(), &disp_img_tex, &im_x, &im_y);
+    disp_img_size = ImVec2(im_x, im_y);
+    IM_ASSERT(ret);
 }
 
 } //  namespace P3

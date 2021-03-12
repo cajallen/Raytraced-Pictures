@@ -159,6 +159,10 @@ struct Point3D{
     return (x-p.x)*(x-p.x) + (y-p.y)*(y-p.y) + (z-p.z)*(z-p.z);
   }
 
+  float magnitude() {
+      return sqrt(x * x + y * y + z * z);
+  }
+
   operator std::string() const {
     char result[100];
     sprintf(result, "Point: (%.2f, %.2f, %.2f)",x,y,z);
@@ -182,6 +186,7 @@ struct Dir3D{
   Point3D operator+(Point3D rhs);
   Dir3D operator+(Dir3D rhs);
   Dir3D operator-(Dir3D rhs);
+  Dir3D operator-();
 
   float magnitude(){
     return sqrt(x*x+y*y+z*z);
@@ -358,6 +363,10 @@ inline Dir3D Dir3D::operator+(Dir3D rhs){
 inline Dir3D Dir3D::operator-(Dir3D rhs){
   return Dir3D(x-rhs.x,y-rhs.y,z-rhs.z);
 }
+inline Dir3D Dir3D::operator-() {
+    return Dir3D(-x, -y, -z);
+}
+
 
 inline Dir3D operator*(Dir3D d, float f){
   return Dir3D(d.x*f,d.y*f,d.z*f);

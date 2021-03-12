@@ -35,6 +35,7 @@ namespace P3 {
 struct Geometry;
 struct Sphere;
 struct Material;
+struct Light;
 
 // This function is used as a helper to parse the keyed lines
 // Pseudo: if prefix_matches ? string_without_prefix : "";
@@ -51,7 +52,7 @@ struct UIObject {
 
     virtual void ImGui() { }
     virtual string Encode() { return ""; }
-    virtual void Decode(string s) { }
+    virtual void Decode(string& s) { }
 
     string WithId(string s);
     bool operator==(UIObject rhs) { return id == rhs.id; }
@@ -71,7 +72,7 @@ struct UICamera : UIObject {
 
     void ImGui();
     string Encode();
-    void Decode(string s); // Camera decode takes in the whole line, instead of post key, as it is multiline.
+    void Decode(string& s); // Camera decode takes in the whole line, instead of post key, as it is multiline.
 };
 
 
@@ -87,7 +88,7 @@ struct UIMaterial : UIObject{
 
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 
@@ -105,7 +106,7 @@ struct UIGeometry : UIObject {
 
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 struct UISphere : UIGeometry {
@@ -118,29 +119,34 @@ struct UISphere : UIGeometry {
 
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 
 struct UILight : UIObject {
     float col[3] = { 0.0f, 0.0f, 0.0f };
+    float mult = 1.0;
 
     using UIObject::UIObject;
+
+    virtual Light* ToLight();
 
     vector<UILight*>::iterator GetIter();
     void Delete();
 
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 struct UIAmbientLight : UILight {
     using UILight::UILight;
 
+    Light* ToLight();
+
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 struct UIPointLight : UILight {
@@ -148,9 +154,11 @@ struct UIPointLight : UILight {
 
     using UILight::UILight;
 
+    Light* ToLight();
+
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 struct UIDirectionalLight : UILight {
@@ -158,9 +166,11 @@ struct UIDirectionalLight : UILight {
 
     using UILight::UILight;
 
+    Light* ToLight();
+
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
 };
 
 struct UISpotLight : UILight {
@@ -173,7 +183,20 @@ struct UISpotLight : UILight {
 
     void ImGui();
     string Encode();
-    void Decode(string s);
+    void Decode(string& s);
+};
+
+
+struct Material {
+    Color ambient = Color();
+    Color diffuse = Color();
+    Color specular = Color();
+    Color transmissive = Color();
+    float phong = 0.0f;
+    float ior = 0.0f;
+
+    Material() { }
+    Material(UIMaterial* from);
 };
 
 
@@ -182,8 +205,13 @@ struct HitInformation {
     Point3D pos;
     Dir3D viewing;
     Dir3D normal;
+
+    Material hit_material;
 };
 
+Color CalculateDiffuse(Light* light, HitInformation hit);
+Color CalculateSpecular(Light* light, HitInformation hit);
+Color CalculateAmbient();
 
 struct Ray {
     Point3D pos;
@@ -205,20 +233,9 @@ struct Camera {
     Camera(UICamera* from);
 };
 
-struct Material {
-    Color ambient = Color();
-    Color diffuse = Color();
-    Color specular = Color();
-    Color transmissive = Color();
-    float phong = 0.0f;
-    float ior = 0.0f;
-
-    Material() { }
-    Material(UIMaterial* from);
-};
 
 struct Geometry {
-    Material material; // We no longer care about pointers because at this point material is just constant values.
+    Material material; // Pointer not necessary
 
     Geometry(UIGeometry* from);
 
@@ -236,6 +253,45 @@ struct Sphere : Geometry {
 };
 
 
+struct Light {
+    Color color;
+
+    Light(UILight* from);
+
+    // Non-enforced abstract
+    virtual Ray ReverseLightRay(Point3D from) { return Ray(Point3D(), Dir3D()); }
+    virtual float DistanceTo(Point3D to) { return -1.0f; }
+    virtual Color Intensity(Point3D to) { return Color(); }
+};
+
+
+struct AmbientLight : Light {
+    AmbientLight(UIAmbientLight* from) : Light(from) { }
+};
+
+
+struct DirectionalLight : Light {
+    Dir3D direction;
+
+    DirectionalLight(UIDirectionalLight* from);
+
+    Ray ReverseLightRay(Point3D from);
+    float DistanceTo(Point3D to);
+    Color Intensity(Point3D to);
+};
+
+
+struct PointLight : Light {
+    Point3D position;
+
+    PointLight(UIPointLight* from);
+
+    Ray ReverseLightRay(Point3D from);
+    float DistanceTo(Point3D to);
+    Color Intensity(Point3D to);
+};
+
+
 
 void Reset();
 void Load();
@@ -243,6 +299,7 @@ void Save();
 void Render();
 
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
+void DisplayImage(string name);
 
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 
