@@ -11,19 +11,19 @@ Ambient lights
 Point light sources  
 Shadows  
 Multiple light sources  
-![alt text](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/multi_light_demo.png)
+![alt text](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/multi_light_demo.png)  
 Directional light sources  
-![directional lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/dir_light.png)
+![directional lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/dir_light.png)  
 Spot light sources  
-![spot lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spot_light.png)
+![spot lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spot_light.png)  
 Basic & Jittered sampling  
-![sampling](https://github.com/cajallen/Raytraced-Pictures/blob/main/SamplingDemo.png)
+![sampling](https://github.com/cajallen/Raytraced-Pictures/blob/main/SamplingDemo.png)  
 Phong Lighting Model  
-![phong](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres1.png)
+![phong](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres1.png)  
 Reflection  
-![reflection](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres2.png)
+![reflection](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres2.png)  
 
 
-... Art contest?... 
+... Art contest?...   
 ![amongus](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/raytraced.png) 
 
