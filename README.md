@@ -1,5 +1,7 @@
+## Compiling
+I use Windows and VS. Good luck.
 
-### Features
+## Features
 Camera placement, resolution, aspect ratio - https://www.youtube.com/watch?v=EaYuvnRhnso  
 User specified background colors  
 UI + OpenGL output - In video above  
@@ -9,13 +11,19 @@ Ambient lights
 Point light sources  
 Shadows  
 Multiple light sources  
+![alt text](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/multi_light_demo.png)
 Directional light sources  
+![directional lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/dir_light.png)
 Spot light sources  
-Basic sampling  
-Jittered Supersampling  
+![spot lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spot_light.png)
+Basic & Jittered sampling  
+![sampling](https://github.com/cajallen/Raytraced-Pictures/blob/main/SamplingDemo.png)
 Phong Lighting Model  
+![phong](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres1.png)
 Reflection  
+![reflection](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres2.png)
 
 
-... Art contest?...  
+... Art contest?... 
+![amongus](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/raytraced.png) 
 
