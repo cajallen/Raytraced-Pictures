@@ -145,6 +145,7 @@ struct Point3D{
   Dir3D operator-(Point3D rhs);
   Point3D operator+(Dir3D rhs);
   Point3D operator-(Dir3D rhs);
+  Point3D operator-();
   Point3D operator+(Point3D rhs);
 
   Point3D normalized(){
@@ -335,6 +336,9 @@ std::ostream& operator<<(std::ostream& os, const Motor3D& mv){
 //Operations on Points:
 inline Point3D Point3D::operator+(Point3D rhs){
   return Point3D(x+rhs.x,y+rhs.y,z+rhs.z);
+}
+inline Point3D Point3D::operator-() {
+    return Point3D(-x, -y, -z);
 }
 
 inline Dir3D Point3D::operator-(Point3D rhs){

@@ -1,0 +1,12 @@
+camera_pos: 3 0 0 
+camera_fwd: 1 0 0 
+camera_up: 0 1 0 
+camera_fov_ha: 8.617
+film_resolution: 640 480
+output_image: wide.png
+background: 1e-06 9.9999e-07 9.9999e-07 
+max_depth: 5
+
+material: 0.683000 0.476000 1.000000 0.524000 0.488000 1.000000 0.146000 0.159000 0.146000 16.000000 0.000000 0.000000 0.000000 1.000000
+sphere: 0.000000 -3.000000 0.000000 3.000000
+directional_light: 10.300000 7.050550 0.000000 -0.15 -1 0.15

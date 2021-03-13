@@ -6,21 +6,37 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+#define LERP(a, b, r) ((1.0 - r) * a + r * b)
+
+
 struct Color{
-  float r,g,b;
+    float r,g,b;
 
-  Color(float r, float g, float b) : r(r), g(g), b(b) {}
-  Color() : r(0), g(0), b(0) {}
+    Color(float r, float g, float b) : r(r), g(g), b(b) {}
+    Color() : r(0), g(0), b(0) {}
 
-  Color operator+(const Color& rhs) const {
-      return Color(r + rhs.r, g + rhs.g, b + rhs.b);
-  }
-  Color operator*(const Color& rhs) const {
-      return Color(r * rhs.r, g * rhs.g, b * rhs.b);
-  }
-  Color operator*(const float& rhs) const {
-      return Color(r * rhs, g * rhs, b * rhs);
-  }
+    Color operator+(const Color& rhs) const {
+        return Color(r + rhs.r, g + rhs.g, b + rhs.b);
+    }
+    Color operator*(const Color& rhs) const {
+        return Color(r * rhs.r, g * rhs.g, b * rhs.b);
+    }
+    Color operator*(const float& rhs) const {
+        return Color(r * rhs, g * rhs, b * rhs);
+    }
+
+    Color Lerp(const Color& rhs, float amt) const {
+        float nr = LERP(r, rhs.r, amt);
+        float ng = LERP(g, rhs.g, amt);
+        float nb = LERP(b, rhs.b, amt);
+        return Color(nr, ng, nb);
+    }
+
+    void Clamp() {
+        r = fmin(r, 1);
+        g = fmin(g, 1);
+        b = fmin(b, 1);
+    }
 };
 
 struct Image{

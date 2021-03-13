@@ -181,6 +181,8 @@ struct UISpotLight : UILight {
 
     using UILight::UILight;
 
+    Light* ToLight();
+
     void ImGui();
     string Encode();
     void Decode(string& s);
@@ -214,10 +216,10 @@ struct Ray {
     Dir3D dir;
     int bounces_left;
 
-    Ray(Point3D p, Dir3D d) : pos(p), dir(d.normalized()) { }
+    Ray(Point3D p, Dir3D d, int b) : pos(p), dir(d.normalized()), bounces_left(b) { }
 };
 
-Ray Reflect(HitInformation hit);
+Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left);
 Color EvaluateRay(Ray ray);
 Color CalculateDiffuse(Light* light, HitInformation hit);
 Color CalculateSpecular(Light* light, HitInformation hit);
@@ -263,7 +265,7 @@ struct Light {
     Light(UILight* from);
 
     // Non-enforced abstract
-    virtual Ray ReverseLightRay(Point3D from) { return Ray(Point3D(), Dir3D()); }
+    virtual Ray ReverseLightRay(Point3D from) { return Ray(Point3D(), Dir3D(), -1); }
     virtual float DistanceTo(Point3D to) { return -1.0f; }
     virtual Color Intensity(Point3D to) { return Color(); }
 };
@@ -295,6 +297,19 @@ struct PointLight : Light {
     Color Intensity(Point3D to);
 };
 
+
+struct SpotLight : Light {
+    Point3D position;
+    Dir3D direction;
+    float angle1;
+    float angle2;
+
+    SpotLight(UISpotLight* from);
+
+    Ray ReverseLightRay(Point3D from);
+    float DistanceTo(Point3D to);
+    Color Intensity(Point3D to);
+};
 
 
 void Reset();

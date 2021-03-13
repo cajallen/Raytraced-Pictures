@@ -7,6 +7,11 @@
 #include "image_lib.h"
 #include "main.h"
 
+#define AA_NONE 0
+#define AA_FIVE -1
+
+#define SAMPLING 0
+
 
 namespace P3 {
 
@@ -41,16 +46,15 @@ string rest_if_prefix(const string prefix, string content) {
 }
 
 
-Ray Reflect(HitInformation hit) {
-    Dir3D to_in = -hit.viewing;
+Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left) {
+    Line3D normal_dir = vee(Point3D(0, 0, 0), norm).normalized();
+    Point3D midpoint = proj(Point3D(ang.x, ang.y, ang.z), normal_dir);
+    Point3D diff = midpoint - ang;
+    Point3D to_out = (midpoint + diff).normalized();
 
-    Line3D normal_dir = vee(Point3D(0, 0, 0), hit.normal).normalized();
-    Point3D in_proj = proj(Point3D(to_in.x, to_in.y, to_in.z), normal_dir);
-    Point3D in_refl = (in_proj - to_in).normalized();
+    Point3D from = pos + norm * 0.001;
 
-    Point3D from = hit.pos + hit.normal * 100 * FLT_EPSILON;
-
-    return Ray(from, Dir3D(in_refl.x, in_refl.y, in_refl.z));
+    return Ray(from, Dir3D(to_out.x, to_out.y, to_out.z), bounces_left);
 }
 
 
@@ -107,11 +111,11 @@ vector<UILight*>::iterator UILight::GetIter() {
 
 void UICamera::ImGui() {
     if (ImGui::CollapsingHeader("Camera Parameters")) {
-        ImGui::InputFloat3("Camera Position", cp);
+        ImGui::DragFloat3("Camera Position", cp, 0.1);
         ImGui::SliderFloat3("Camera Forward", cf, -1.0f, 1.0f);
         ImGui::SliderFloat3("Camera Up", cu, -1.0f, 1.0f);
         ImGui::SliderFloat("FOV", &fov_ha, 0.0f, 90.0f);
-        ImGui::InputInt2("Resolution", window_res, 1);
+        ImGui::DragInt2("Resolution", window_res, 1);
         ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
         ImGui::ColorPicker3("Background Color", bc);
     }
@@ -136,8 +140,8 @@ void UIGeometry::ImGui() {
 void UISphere::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Sphere ").c_str())) {
-        ImGui::InputFloat3(WithId("pos##").c_str(), pos);
-        ImGui::SliderFloat(WithId("radius##").c_str(), &rad, 0.001f, 10.0f);
+        ImGui::DragFloat3(WithId("pos##").c_str(), pos, 0.02);
+        ImGui::DragFloat(WithId("radius##").c_str(), &rad, 0.01, 0.01);
         ImGui::Indent(3.0f);
         mat->ImGui();
         ImGui::Unindent(3.0f);
@@ -165,64 +169,70 @@ void UIMaterial::ImGui() {
 
 
 void UILight::ImGui() {
+    ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Light ").c_str())) {
-        ImGui::Indent(4.0f);
         ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
-        ImGui::Unindent(4.0f);
     }
+    ImGui::Unindent(6.0f);
 }
 
 
 void UIAmbientLight::ImGui() {
+    ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
-        ImGui::Indent(4.0f);
-        ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
+        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
-        ImGui::Unindent(4.0f);
     }
+    ImGui::Unindent(6.0f);
 }
 
 void UIPointLight::ImGui() {
+    ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
-        ImGui::Indent(4.0f);
-        ImGui::DragFloat3(WithId("pos##").c_str(), pos);
-        ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
+        ImGui::DragFloat3(WithId("pos##").c_str(), pos, 0.1);
+        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
-        ImGui::Unindent(4.0f);
     }
+    ImGui::Unindent(6.0f);
 }
 
 void UISpotLight::ImGui() {
+    ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Spot ").c_str())) {
-        ImGui::Indent(4.0f);
+        ImGui::DragFloat3(WithId("pos##").c_str(), pos, 0.1);
+        ImGui::SliderFloat3(WithId("dir##").c_str(), dir, -1, 1);
+        ImGui::SliderFloat(WithId("interior_angle##").c_str(), &angle1, 0, 90);
+        angle2 = max(angle1, angle2);
+        ImGui::SliderFloat(WithId("exterior_angle##").c_str(), &angle2, angle1, 90);
+        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
-        ImGui::Unindent(4.0f);
     }
+    ImGui::Unindent(6.0f);
 }
 
 void UIDirectionalLight::ImGui() {
+    ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
-        ImGui::Indent(4.0f);
         ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
         ImGui::DragFloat3(WithId("direction##").c_str(), dir, 0.01, -1.0, 1.0);
         ImGui::ColorPicker3(WithId("color##").c_str(), col);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
-        ImGui::Unindent(4.0f);
     }
+    ImGui::Unindent(6.0f);
 }
 
 
@@ -400,7 +410,7 @@ string UIPointLight::Encode() {
 
 string UISpotLight::Encode() {
     stringstream ss;
-    ss << "spot_light: " << UILight::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2] << dir[0] << " " << dir[1] << " " << dir[2] << " " << angle1 << " " << angle2;
+    ss << "spot_light: " << UILight::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2] << " " <<dir[0] << " " << dir[1] << " " << dir[2] << " " << angle1 << " " << angle2;
 
     return ss.str();
 }
@@ -432,6 +442,10 @@ Light* UIDirectionalLight::ToLight() {
 
 Light* UIPointLight::ToLight() {
     return new PointLight(this);
+}
+
+Light* UISpotLight::ToLight() {
+    return new SpotLight(this);
 }
 
 
@@ -484,6 +498,14 @@ PointLight::PointLight(UIPointLight* from) : Light(from) {
     position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
 }
 
+SpotLight::SpotLight(UISpotLight* from) : Light(from) {
+    position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
+    direction = Dir3D(from->dir[0], from->dir[1], from->dir[2]).normalized();
+
+    angle1 = from->angle1;
+    angle2 = from->angle2;
+}
+
 
 
 
@@ -511,14 +533,20 @@ bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
 
 
 Ray DirectionalLight::ReverseLightRay(Point3D from) {
-    return Ray{ from, -direction };
+    return Ray{ from, -direction, -1 };
 }
 
 
 Ray PointLight::ReverseLightRay(Point3D from) {
     Dir3D offset = position - from;
 
-    return Ray{ from, offset.normalized() };
+    return Ray{ from, offset.normalized(), -1 };
+}
+
+Ray SpotLight::ReverseLightRay(Point3D from) {
+    Dir3D offset = position - from;
+
+    return Ray{ from, offset.normalized(), -1 };
 }
 
 
@@ -527,6 +555,11 @@ float DirectionalLight::DistanceTo(Point3D to) {
 }
 
 float PointLight::DistanceTo(Point3D to) {
+    Dir3D offset = to - position;
+    return offset.magnitude();
+}
+
+float SpotLight::DistanceTo(Point3D to) {
     Dir3D offset = to - position;
     return offset.magnitude();
 }
@@ -544,6 +577,19 @@ Color PointLight::Intensity(Point3D to) {
     float b = color.b / dist2;
 
     return Color(r,g,b);
+}
+
+
+Color SpotLight::Intensity(Point3D to) {
+    Dir3D angle_to = (to - position).normalized();
+    float diff = 180 * acos(dot(angle_to, direction)) / M_PI;
+    float dist2 = pow(DistanceTo(to), 2);
+
+    if (diff < angle1) return color * (1/dist2);
+    float amount = 1 - ((diff - angle1) / (angle2 - angle1));
+    if (diff < angle2) return color * amount * (1 / dist2);
+
+    return Color(0, 0, 0);
 }
 
 
@@ -661,7 +707,7 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
 
     for (Light* light : lights) {
         Ray to_light = light->ReverseLightRay(hit_info.pos);
-        to_light.pos = to_light.pos + hit_info.normal * 100 * FLT_EPSILON;
+        to_light.pos = to_light.pos + hit_info.normal * 0.0001;
         HitInformation light_intersection;
         // If light is blocked
         if (FindIntersection(geometry, to_light, &light_intersection) && light_intersection.dist < light->DistanceTo(hit_info.pos)) continue;
@@ -669,9 +715,8 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
         current = current + CalculateDiffuse(light, hit_info);
         current = current + CalculateSpecular(light, hit_info);
     }
-    Ray test = Reflect(hit_info);
-    test.bounces_left = ray.bounces_left - 1;
-    current = current + hit_info.material.specular * EvaluateRay(test);
+    Ray reflected = Reflect(-hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
+    current = current + hit_info.material.specular * EvaluateRay(reflected);
     current = current + CalculateAmbient(hit_info);
 
     return current;
@@ -683,7 +728,6 @@ Color EvaluateRay(Ray ray) {
 
     HitInformation hit_info;
     if (FindIntersection(geometry, ray, &hit_info)) {
-        return Color(hit_info.normal.x * 0.5 + 0.5, hit_info.normal.y * 0.5 + 0.5, hit_info.normal.z * 0.5 + 0.5);
         return ApplyLighting(ray, hit_info);
     }
     else {
@@ -701,11 +745,8 @@ Color CalculateDiffuse(Light* light, HitInformation hit) {
 Color CalculateSpecular(Light* light, HitInformation hit) {
     Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
     Dir3D to_viewer = -hit.viewing;
-    Line3D normal_line = vee(Point3D(0, 0, 0), hit.normal).normalized();
-    Point3D tl_projected = proj(Point3D(to_light.x, to_light.y, to_light.z), normal_line);
-    Point3D tl_reflected = (tl_projected - to_light).normalized();
-    Dir3D tlr_dir = Dir3D(tl_reflected.x, tl_reflected.y, tl_reflected.z);
-    float amount = pow(max(0, dot(tlr_dir, to_viewer)), hit.material.phong);
+    Ray test = Reflect(to_light, hit.pos, hit.normal, -1);
+    float amount = pow(max(0, dot(test.dir, to_viewer)), hit.material.phong);
 
     Color il = light->Intensity(hit.pos);
 
@@ -716,7 +757,7 @@ Color CalculateAmbient(HitInformation hit) {
     Color c = Color(0, 0, 0);
 
     for (AmbientLight* al : ambient) {
-        c = c + hit.material.diffuse * al->color;
+        c = c + hit.material.ambient * al->color;
     }
     return c;
 }
@@ -745,15 +786,47 @@ void Render() {
     Image outputImg = Image(camera->res[X], camera->res[Y]);
     for (int i = 0; i < camera->res[X]; i++) {
         for (int j = 0; j < camera->res[Y]; j++) {
-            float u = camera->mid_res[X] - camera->res[X]*((i + 0.5) / camera->res[X]);
-            float v = camera->mid_res[Y] - camera->res[Y]*((j + 0.5) / camera->res[Y]);
-            Point3D p = camera->position - d * camera->forward + u * camera->right + v * camera->up;
-            Dir3D rayDir = (p - camera->position).normalized();
+#if SAMPLING == -1
+            Color col = Color(0, 0, 0);
+            Color last_color;
+            for (ImVec2 offset : {ImVec2(0.5, 0.5), ImVec2(0.1, 0.1), ImVec2(0.9, 0.1), ImVec2(0.9, 0.9), ImVec2(0.1, 0.9)}) {
+                float ii = i + offset.x;
+                float jj = j + offset.y;
+                float u = camera->mid_res[X] - ii;
+                float v = camera->mid_res[Y] - jj;
 
-            Ray ray = Ray(camera->position, rayDir);
-            ray.bounces_left = camera->max_depth;
-            Color col = EvaluateRay(ray);
+                Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
 
+                Ray ray = Ray(camera->position, rayDir, camera->max_depth);
+                Color new_color = EvaluateRay(ray);
+                new_color.Clamp();
+                col = col + (new_color * 0.25);
+            }
+#elif SAMPLING == 0
+        float u = camera->mid_res[X] - i + 0.5;
+        float v = camera->mid_res[Y] - j + 0.5;
+
+        Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
+
+        Ray ray = Ray(camera->position, rayDir, camera->max_depth);
+        Color col = EvaluateRay(ray);
+#else
+            Color col = Color(0, 0, 0);
+            Color last_color;
+            for (int samp_i = 0; samp_i < SAMPLING; samp_i++) {
+                float ii = i + rand() / (float) RAND_MAX;
+                float jj = j + rand() / (float) RAND_MAX;
+                float u = camera->mid_res[X] - ii;
+                float v = camera->mid_res[Y] - jj;
+
+                Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
+
+                Ray ray = Ray(camera->position, rayDir, camera->max_depth);
+                Color new_color = EvaluateRay(ray);
+                new_color.Clamp();
+                col = col + (new_color * 0.25);
+            }
+#endif
             outputImg.setPixel(i, j, col);
         }
     }
@@ -932,6 +1005,8 @@ int main(int argc, char** argv) {
                 shape->ImGui();
             }
             if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth(), 0))) {
+                UIMaterial* mat = new UIMaterial();
+                ui_materials.push_back(mat);
                 ui_shapes.push_back(new UISphere());
             }
         }
