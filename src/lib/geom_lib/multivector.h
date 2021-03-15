@@ -12,7 +12,7 @@
 #include <iostream>
 #include <fstream>
 
-std::string roundToString(float num, int p=3){
+inline std::string roundToString(float num, int p=3){
   std::string num_text = std::to_string(num+0.5*powf(10,-(p+1)));
   return num_text.substr(0, num_text.find(".")+(p+1));
 }
@@ -205,7 +205,7 @@ struct MultiVector{
 
 };
 
-std::ostream& operator<<(std::ostream& os, const MultiVector& mv){
+inline std::ostream& operator<<(std::ostream& os, const MultiVector& mv){
   return os << std::string(mv);
 }
 

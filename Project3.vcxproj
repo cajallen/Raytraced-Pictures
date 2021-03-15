@@ -72,8 +72,9 @@
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>src/lib/SDL2-2.0.14/include;src\lib;src;src\lib\imgui-1.81;src\lib\geom_lib;$(IncludePath)</IncludePath>
-    <LibraryPath>src/lib/SDL2-2.0.14/lib/x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>src\lib\SDL2-2.0.14\include;src\lib;src;src\lib\imgui-1.81;src\lib\geom_lib;$(IncludePath)</IncludePath>
+    <LibraryPath>src\lib\SDL2-2.0.14\lib\x64;$(LibraryPath)</LibraryPath>
+    <SourcePath>C:\Users\cajal\Documents\School\2021SPRING\Graphics\Project3\src;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -112,7 +113,7 @@
       <SubSystem>Windows</SubSystem>
     </Link>
     <ClCompile>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -126,7 +127,8 @@
     <ClCompile Include="src\lib\imgui-1.81\imgui_tables.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui_widgets.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\misc\cpp\imgui_stdlib.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\raytracer_main.cpp" />
+    <ClCompile Include="src\raytracer_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lib\geom_lib\PGA_3D.h" />
@@ -219,7 +221,7 @@
     <ClInclude Include="src\lib\SDL2-2.0.14\include\SDL_vulkan.h" />
     <ClInclude Include="src\lib\stb_image.h" />
     <ClInclude Include="src\lib\stb_image_write.h" />
-    <ClInclude Include="src\main.h" />
+    <ClInclude Include="src\raytracer_main.h" />
     <ClInclude Include="src\lib\geom_lib\multivector.h" />
     <ClInclude Include="src\lib\glad\glad.h" />
     <ClInclude Include="src\lib\glad\khrplatform.h" />

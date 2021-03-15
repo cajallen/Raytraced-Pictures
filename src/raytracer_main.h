@@ -1,11 +1,11 @@
-#pragma once
+#ifndef _MAIN_H
+#define _MAIN_H
 
 #include <PGA_3D.h>
 #include <SDL.h>
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl.h>
 #include <glad/glad.h>
-#include <imgui.h>
 #include <array>
 #include <fstream>
 #include <image_lib.h>
@@ -35,7 +35,7 @@ struct Light;
 
 // This function is used as a helper to parse the keyed lines
 // Pseudo: if prefix_matches ? string_without_prefix : "";
-string rest_if_prefix(const string prefix, string content);
+inline string rest_if_prefix(const string prefix, string content);
 
 // spaced string stream
 struct ossstream {
@@ -43,7 +43,7 @@ struct ossstream {
 	ostringstream& sstream;
 };
 // Hahahahahahahhaha
-ossstream& operator << (ossstream& inp_stream, string start) { 
+inline ossstream& operator << (ossstream& inp_stream, string start) { 
 	inp_stream.sstream << endl << start; 
 	return inp_stream;
 }
@@ -239,3 +239,5 @@ void DisplayImage(string name);
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 
 }  // namespace P3
+
+#endif

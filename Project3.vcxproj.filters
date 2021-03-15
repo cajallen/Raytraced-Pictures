@@ -42,10 +42,13 @@
     <ClCompile Include="src\lib\imgui-1.81\misc\cpp\imgui_stdlib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\main.cpp">
+    <ClCompile Include="src\lib\image_lib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\lib\image_lib.cpp">
+    <ClCompile Include="src\raytracer_main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\raytracer_ui.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -90,9 +93,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\imgui-1.81\misc\single_file\imgui_single_file.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\main.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\SDL2-2.0.14\include\begin_code.h">
@@ -363,6 +363,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\geom_lib\PGA_3D.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\raytracer_main.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
