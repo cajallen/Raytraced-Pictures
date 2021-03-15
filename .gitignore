@@ -1,7 +1,8 @@
-SceneFile.pdf
+/SceneFile.pdf
 /x64
-.vs
-Debug
+/.vs
+/Debug
+/enc_temp_folder
+/src/.vscode
 .user
 .ini
-examples_partA

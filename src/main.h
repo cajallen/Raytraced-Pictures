@@ -1,21 +1,18 @@
 #pragma once
 
-#include "imgui.h"
-#include "backends/imgui_impl_opengl3.h"
-#include "backends/imgui_impl_sdl.h"
-#include <stdio.h>
+#include <PGA_3D.h>
 #include <SDL.h>
-#include <direct.h>
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_sdl.h>
 #include <glad/glad.h>
-#include <algorithm>
+#include <imgui.h>
 #include <array>
 #include <fstream>
+#include <image_lib.h>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include "PGA_3D.h"
-#include "image_lib.h"
 
 using std::array;
 using std::cout;
@@ -39,6 +36,23 @@ struct Light;
 // This function is used as a helper to parse the keyed lines
 // Pseudo: if prefix_matches ? string_without_prefix : "";
 string rest_if_prefix(const string prefix, string content);
+
+// spaced string stream
+struct ossstream {
+	ossstream(ostringstream& sstream) : sstream(sstream) {}
+	ostringstream& sstream;
+};
+// Hahahahahahahhaha
+ossstream& operator << (ossstream& inp_stream, string start) { 
+	inp_stream.sstream << endl << start; 
+	return inp_stream;
+}
+template<class T>
+ossstream& operator << (ossstream& inp_stream, const T& x) {
+	inp_stream.sstream << " " << x ;
+	return inp_stream;
+}
+
 
 struct Ray {
     Point3D pos;
@@ -75,11 +89,11 @@ struct Object {
 };
 
 struct Material : Object {
-    Color ambient = Color();
-    Color diffuse = Color();
-    Color specular = Color();
-    Color transmissive = Color();
-    float phong = 0.0f;
+    Color ambient = Color(0.5, 0.5, 0.5);
+    Color diffuse = Color(0.5, 0.5, 0.5);
+    Color specular = Color(0.2, 0.2, 0.2);
+    Color transmissive = Color(0, 0, 0);
+    float phong = 8.0f;
     float ior = 0.0f;
 
     using Object::Object;
@@ -89,14 +103,13 @@ struct Material : Object {
     void Decode(string& s);
 };
 
-
 struct Camera : Object {
-    Point3D position;
-    Dir3D forward, up, right;
-    Color background_color;
-    float half_vfov;
-    array<int, 2> res;
-    array<int, 2> mid_res;
+    Point3D position = Point3D(0, 0, 0);
+    Dir3D forward = Dir3D(-1, 0, 0), up = Dir3D(0, 1, 0), right = Dir3D(0, 0, 0);
+    Color background_color = Color(0, 0, 0);
+    float half_vfov = 45;
+    array<int, 2> res{640, 480};
+    array<int, 2> mid_res{320, 240};
     int max_depth = 5;
 
     using Object::Object;
@@ -123,8 +136,8 @@ struct Geometry : Object {
 };
 
 struct Sphere : Geometry {
-    Point3D position;
-    float radius;
+    Point3D position = Point3D(0, 0, 0);
+    float radius = 1.0;
 
     using Geometry::Geometry;
 
@@ -137,8 +150,8 @@ struct Sphere : Geometry {
 
 // Non-enforced abstract class for lights
 struct Light : Object {
-    Color color;
-	float mult;
+    Color color = Color(1, 1, 1);
+    float mult = 1.0;
     void UpdateMult();
     void ClampColor();
 
@@ -159,13 +172,13 @@ struct Light : Object {
 struct AmbientLight : Light {
     using Light::Light;
 
-	void ImGui();
+    void ImGui();
     string Encode();
     void Decode(string& s);
 };
 
 struct DirectionalLight : Light {
-    Dir3D direction;
+    Dir3D direction = Dir3D(0, -1, 0);
 
     using Light::Light;
 
@@ -179,7 +192,7 @@ struct DirectionalLight : Light {
 };
 
 struct PointLight : Light {
-    Point3D position;
+    Point3D position = Point3D(0, 0, 0);
 
     using Light::Light;
 
@@ -193,10 +206,10 @@ struct PointLight : Light {
 };
 
 struct SpotLight : Light {
-    Point3D position;
-    Dir3D direction;
-    float angle1;
-    float angle2;
+    Point3D position = Point3D(0, 0, 0);
+    Dir3D direction = Dir3D(0, -1, 0);
+    float angle1 = 30.0;
+    float angle2 = 45.0;
 
     using Light::Light;
 

@@ -1,14 +1,20 @@
 // Main templated from Dear ImGui
 #include "main.h"
 
+// any SAMPLING > 0 is randomly sampled.
+#define AA_RANDOM 4
 #define AA_NONE 0
 #define AA_FIVE -1
 
-#define SAMPLING 0
+#define SAMPLING AA_NONE
 
+#define UI_HSPACING
+
+inline float randf() {
+    return rand() / (float)RAND_MAX;
+}
 
 namespace P3 {
-
 
 char output_name[256] = "raytraced.bmp";
 
@@ -16,24 +22,21 @@ char output_name[256] = "raytraced.bmp";
 vector<Geometry*> shapes{};
 vector<Light*> lights{};
 vector<AmbientLight*> ambient_lights{};
-vector<Material*> materials{ new Material() };
+vector<Material*> materials{new Material()};
 Camera* camera = new Camera();
 int entity_count = 0;
 char scene_name[256] = "";
 
-ImVec2 disp_img_size{ 0.0, 0.0 };
+ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
-
 
 string rest_if_prefix(const string prefix, string content) {
     if (content.compare(0, prefix.length(), prefix) == 0) {
         return content.substr(prefix.length());
-    }
-    else {
+    } else {
         return "";
     }
 }
-
 
 Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left) {
     Line3D normal_dir = vee(Point3D(0, 0, 0), norm).normalized();
@@ -46,7 +49,6 @@ Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left) {
     return Ray(from, Dir3D(to_out.x, to_out.y, to_out.z), bounces_left);
 }
 
-
 Object::Object() {
     id = entity_count;
     entity_count++;
@@ -56,11 +58,9 @@ Object::Object(int old_id) {
     id = old_id;
 }
 
-
 string Object::WithId(string s) {
     return (s + std::to_string(id)).c_str();
 }
-
 
 // Call without index to create new shapes
 Geometry::Geometry() : Object() {
@@ -71,10 +71,12 @@ Geometry::Geometry(int old_id) : Object(old_id) {
     material = materials.back();
 }
 
-
-void Geometry::Delete() { shapes.erase(GetIter()); }
-void Light::Delete() { lights.erase(GetIter()); }
-
+void Geometry::Delete() {
+    shapes.erase(GetIter());
+}
+void Light::Delete() {
+    lights.erase(GetIter());
+}
 
 vector<Geometry*>::iterator Geometry::GetIter() {
     for (vector<Geometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
@@ -86,7 +88,6 @@ vector<Geometry*>::iterator Geometry::GetIter() {
     return shapes.end();
 }
 
-
 vector<Light*>::iterator Light::GetIter() {
     for (vector<Light*>::iterator it = lights.begin(); it < lights.end(); it++) {
         if ((*it)->id == id) {
@@ -97,7 +98,6 @@ vector<Light*>::iterator Light::GetIter() {
     return lights.end();
 }
 
-
 void Camera::ImGui() {
     if (ImGui::CollapsingHeader("Camera Parameters")) {
         ImGui::DragFloat3("Camera Position", &position.x, 0.1);
@@ -106,9 +106,9 @@ void Camera::ImGui() {
         ImGui::SliderFloat("FOV", &half_vfov, 0.0f, 90.0f);
         ImGui::DragInt2("Resolution", &res[0], 1);
         ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
-        ImGui::ColorPicker3("Background Color", &background_color.r);
+        ImGui::ColorEdit3("Background Color", &background_color.r);
     }
-    mid_res = { res[X] / 2, res[Y] / 2 };
+    mid_res = {res[X] / 2, res[Y] / 2};
 
     forward = forward.normalized();
     right = cross(up, forward).normalized();
@@ -146,20 +146,18 @@ void Sphere::ImGui() {
     ImGui::Unindent(6.0f);
 }
 
-
 void Material::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Material ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::SliderFloat3(WithId("ambient##").c_str(), &ambient.r, 0.0f, 1.0f);
-        ImGui::SliderFloat3(WithId("diffuse##").c_str(), &diffuse.r, 0.0f, 1.0f);
-        ImGui::SliderFloat3(WithId("specular##").c_str(), &specular.r, 0.0f, 1.0f);
-        ImGui::SliderFloat3(WithId("transmissive##").c_str(), &transmissive.r, 0.0f, 1.0f);
+        ImGui::ColorEdit3(WithId("ambient##").c_str(), &ambient.r);
+        ImGui::ColorEdit3(WithId("diffuse##").c_str(), &diffuse.r);
+        ImGui::ColorEdit3(WithId("specular##").c_str(), &specular.r);
+        ImGui::ColorEdit3(WithId("transmissive##").c_str(), &transmissive.r);
         ImGui::SliderFloat(WithId("phong##").c_str(), &phong, 0.0f, 50.0f, "%.1f", ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat(WithId("ior##").c_str(), &ior, 0.0f, 1.0f);
         ImGui::Unindent(4.0f);
     }
 }
-
 
 void Light::ImGui() {
     ImGui::Indent(6.0f);
@@ -174,7 +172,7 @@ void Light::ImGui() {
 void AmbientLight::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
-        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
+        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.05);
         ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
@@ -187,7 +185,7 @@ void PointLight::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
         ImGui::DragFloat3(WithId("pos##").c_str(), &position.x, 0.1);
-        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
+        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01, 1000.0);
         ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
@@ -205,7 +203,7 @@ void SpotLight::ImGui() {
         angle2 = max(angle1, angle2);
         ImGui::SliderFloat(WithId("exterior_angle##").c_str(), &angle2, angle1, 90);
         ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
-        ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
+        ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -218,14 +216,13 @@ void DirectionalLight::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
         ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
         ImGui::DragFloat3(WithId("direction##").c_str(), &direction.x, 0.01, -1.0, 1.0);
-        ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
+        ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
     }
     ImGui::Unindent(6.0f);
 }
-
 
 void Camera::Decode(string& s) {
     string rest;
@@ -278,18 +275,13 @@ void Camera::Decode(string& s) {
     }
 }
 
-
 void Material::Decode(string& s) {
     stringstream ss(s);
-    ss >> ambient.r >> ambient.g >> ambient.b >>
-        diffuse.r >> diffuse.g >> diffuse.b >>
-        specular.r >> specular.g >> specular.b >> phong >>
-        transmissive.r >> transmissive.g >> transmissive.b >> ior;
+    ss >> ambient.r >> ambient.g >> ambient.b >> diffuse.r >> diffuse.g >> diffuse.b >> specular.r >> specular.g >>
+        specular.b >> phong >> transmissive.r >> transmissive.g >> transmissive.b >> ior;
 }
 
-void Geometry::Decode(string& s) {
-}
-
+void Geometry::Decode(string& s) {}
 
 void Sphere::Decode(string& s) {
     stringstream ss(s);
@@ -326,87 +318,80 @@ void SpotLight::Decode(string& s) {
     ss >> position.x >> position.y >> position.z >> direction.x >> direction.y >> direction.z >> angle1 >> angle2;
 }
 
-
 string Camera::Encode() {
-    stringstream ss;
+    ostringstream oss;
+    ossstream osss(oss);
 
-    ss << "camera_pos: " << position.x << " " << position.y << " " << position.z << " " << endl;
-    ss << "camera_fwd: " << forward.x << " " << forward.y << " " << forward.z << " " << endl;
-    ss << "camera_up: " << up.x << " " << up.y << " " << up.z << " " << endl;
-    ss << "camera_fov_ha: " << half_vfov << endl;
-    ss << "film_resolution: " << res[0] << " " << res[1] << endl;
-    ss << "output_image: " << output_name << endl;
-    ss << "background: " << background_color.r << " " << background_color.g << " " << background_color.b << " " << endl;
-    ss << "max_depth: " << max_depth << endl;
+    osss << "camera_pos:" << position.x << position.y << position.z;
+    osss << "camera_fwd:" << forward.x << forward.y << forward.z;
+    osss << "camera_up:" << up.x << up.y << up.z;
+    osss << "camera_fov_ha:" << half_vfov;
+    osss << "film_resolution:" << res[0] << res[1];
+    osss << "output_image:" << output_name;
+    osss << "background:" << background_color.r << background_color.g << background_color.b;
+    osss << "max_depth:" << max_depth << "";
 
-    return ss.str();
+    return oss.str();
 }
 
-
 string Material::Encode() {
-    char temp[256];
-    sprintf(temp, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f",
-        ambient.r, ambient.g, ambient.b,
-        diffuse.r, diffuse.g, diffuse.b,
-        specular.r, specular.g, specular.b, phong,
-        transmissive.r, transmissive.g, transmissive.b, ior);
-
-    return string(temp);
+    ostringstream oss("material:");
+    ossstream osss(oss);
+    osss << ambient.r << ambient.g << ambient.b << diffuse.r << diffuse.g << diffuse.b << specular.r << specular.g
+         << specular.b << phong << transmissive.r << transmissive.g << transmissive.b << ior;
+    return oss.str();
 }
 
 string Geometry::Encode() {
-    return string("material: ") + material->Encode() + string("\n");
+    string temp = material->Encode();
+    temp += "\n";
+    return temp;
 }
 
 string Sphere::Encode() {
-    char temp[256];
-    sprintf(temp, "sphere: %f %f %f %f", position.x, position.y, position.z, radius);
-
-    return Geometry::Encode() + string(temp);
+    ostringstream oss(Geometry::Encode() + "sphere:");
+    ossstream osss(oss);
+    osss << position.x << position.y << position.z << radius;
+    return oss.str();
 }
 
 string Light::Encode() {
-    char temp[256];
-    sprintf(temp, "%f %f %f", color.r * mult, color.g * mult, color.b * mult);
-
-    return string(temp);
+    ostringstream oss;
+    ossstream osss(oss);
+    osss << color.r * mult << color.g * mult << color.b * mult;
+    return oss.str();
 }
 
 string AmbientLight::Encode() {
-    stringstream ss;
-    ss << "ambient_light: " << Light::Encode();
-
-    return ss.str();
+    string temp = "ambient_light:" + Light::Encode();
+    return temp;
 }
 
 string DirectionalLight::Encode() {
-    stringstream ss;
-    ss << "directional_light: " << Light::Encode() << " " << direction.x << " " << direction.y << " " << direction.z;
-
-    return ss.str();
+    ostringstream oss("directional_light:" + Light::Encode());
+    ossstream osss(oss);
+    osss << direction.x << direction.y << direction.z;
+    return oss.str();
 }
 
 string PointLight::Encode() {
-    stringstream ss;
-    ss << "point_light: " << Light::Encode() << " " << position.x << " " << position.y << " " << position.z;
-
-    return ss.str();
+    ostringstream oss("point_light:" + Light::Encode());
+    ossstream osss(oss);
+    osss << position.x << position.y << position.z;
+    return oss.str();
 }
 
 string SpotLight::Encode() {
-    stringstream ss;
-    ss << "spot_light: " << Light::Encode() << " " << position.x << " " << position.y << " " << position.z <<
-			" " << direction.x << " " << direction.y << " " << direction.z << " " << angle1 << " " << angle2;
-
-    return ss.str();
+    ostringstream oss("spot_light:" + Light::Encode());
+    ossstream osss(oss);
+    osss << position.x << position.y << position.z << direction.x << direction.y << direction.z << angle1 << angle2;
+    return oss.str();
 }
-
 
 void Light::UpdateMult() {
     color = color * mult;
     mult = 1;
 }
-
 
 void Light::ClampColor() {
     if (color.r > 1 || color.g > 1 || color.b > 1) {
@@ -418,47 +403,46 @@ void Light::ClampColor() {
     }
 }
 
-
 bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
     Dir3D toStart = (ray.pos - position);
     float b = 2 * dot(ray.dir, toStart);
     float c = dot(toStart, toStart) - pow(radius, 2);
     float discr = pow(b, 2) - 4 * c;
 
-    if (discr < 0) return false;
+    if (discr < 0)
+        return false;
 
     float t0 = (-b + sqrt(discr)) / 2;
     float t1 = (-b - sqrt(discr)) / 2;
     float mint = t0;
-    if (t1 > 0.0 && t1 < t0) mint = t1;
+    if (t1 > 0.0 && t1 < t0)
+        mint = t1;
 
-    if (mint < 0.0) return false;
+    if (mint < 0.0)
+        return false;
 
     Point3D hit_pos = ray.pos + mint * ray.dir;
     Dir3D hit_norm = (hit_pos - position).normalized();
-    *intersection = HitInformation{ mint, hit_pos, ray.dir, hit_norm, material };
-    
+    *intersection = HitInformation{mint, hit_pos, ray.dir, hit_norm, material};
+
     return true;
 }
 
-
 Ray DirectionalLight::ReverseLightRay(Point3D from) {
-    return Ray{ from, -direction, -1 };
+    return Ray{from, -direction, -1};
 }
-
 
 Ray PointLight::ReverseLightRay(Point3D from) {
     Dir3D offset = position - from;
 
-    return Ray{ from, offset.normalized(), -1 };
+    return Ray{from, offset.normalized(), -1};
 }
 
 Ray SpotLight::ReverseLightRay(Point3D from) {
     Dir3D offset = position - from;
 
-    return Ray{ from, offset.normalized(), -1 };
+    return Ray{from, offset.normalized(), -1};
 }
-
 
 float DirectionalLight::DistanceTo(Point3D to) {
     return INFINITY;
@@ -474,11 +458,9 @@ float SpotLight::DistanceTo(Point3D to) {
     return offset.magnitude();
 }
 
-
 Color DirectionalLight::Intensity(Point3D to) {
     return color;
 }
-
 
 Color PointLight::Intensity(Point3D to) {
     float dist2 = pow(DistanceTo(to), 2);
@@ -486,22 +468,22 @@ Color PointLight::Intensity(Point3D to) {
     float g = color.g / dist2;
     float b = color.b / dist2;
 
-    return Color(r,g,b);
+    return Color(r, g, b);
 }
-
 
 Color SpotLight::Intensity(Point3D to) {
     Dir3D angle_to = (to - position).normalized();
     float diff = 180 * acos(dot(angle_to, direction)) / M_PI;
     float dist2 = pow(DistanceTo(to), 2);
 
-    if (diff < angle1) return color * (1/dist2);
+    if (diff < angle1)
+        return color * (1 / dist2);
     float amount = 1 - ((diff - angle1) / (angle2 - angle1));
-    if (diff < angle2) return color * amount * (1 / dist2);
+    if (diff < angle2)
+        return color * amount * (1 / dist2);
 
     return Color(0, 0, 0);
 }
-
 
 void Reset() {
     delete camera;
@@ -526,14 +508,14 @@ void Reset() {
     camera = new Camera();
 }
 
-
 void Load() {
     Reset();
 
     string scene_string = "scenes/" + string(scene_name) + ".p3";
 
     ifstream scene_file(scene_string);
-    if (!scene_file.is_open()) return;
+    if (!scene_file.is_open())
+        return;
 
     string line;
     while (getline(scene_file, line)) {
@@ -587,7 +569,6 @@ void Load() {
     scene_file.close();
 }
 
-
 void Save() {
     if (string(scene_name) == "") {
         return;
@@ -596,7 +577,9 @@ void Save() {
     string scene_string = "scenes/" + string(scene_name) + ".p3";
 
     ofstream scene_file(scene_string);
-    if (!scene_file.is_open()) { return; }
+    if (!scene_file.is_open()) {
+        return;
+    }
 
     scene_file << camera->Encode() << endl;
 
@@ -611,18 +594,20 @@ void Save() {
     scene_file.close();
 }
 
-
 Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
 
     for (Light* light : lights) {
-        if (light->Intensity(hit_info.pos) == Color(0, 0, 0)) continue;
+        if (light->Intensity(hit_info.pos) == Color(0, 0, 0))
+            continue;
 
         Ray to_light = light->ReverseLightRay(hit_info.pos);
         to_light.pos = to_light.pos + hit_info.normal * 0.0001;
         HitInformation light_intersection;
         // If light is blocked
-        if (FindIntersection(shapes, to_light, &light_intersection) && light_intersection.dist < light->DistanceTo(hit_info.pos)) continue;
+        if (FindIntersection(shapes, to_light, &light_intersection) &&
+            light_intersection.dist < light->DistanceTo(hit_info.pos))
+            continue;
 
         current = current + CalculateDiffuse(light, hit_info);
         current = current + CalculateSpecular(light, hit_info);
@@ -634,15 +619,14 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
     return current;
 }
 
-
 Color EvaluateRay(Ray ray) {
-    if (ray.bounces_left <= 0) return camera->background_color;
+    if (ray.bounces_left <= 0)
+        return camera->background_color;
 
     HitInformation hit_info;
     if (FindIntersection(shapes, ray, &hit_info)) {
         return ApplyLighting(ray, hit_info);
-    }
-    else {
+    } else {
         return camera->background_color;
     }
 }
@@ -675,7 +659,6 @@ Color CalculateAmbient(HitInformation hit) {
     return c;
 }
 
-
 void Render() {
     float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
 
@@ -690,47 +673,28 @@ void Render() {
     Image outputImg = Image(camera->res[X], camera->res[Y]);
     for (int i = 0; i < camera->res[X]; i++) {
         for (int j = 0; j < camera->res[Y]; j++) {
+            vector<ImVec2> offsets;
 #if SAMPLING == -1
-            Color col = Color(0, 0, 0);
-            Color last_color;
-            for (ImVec2 offset : {ImVec2(0.5, 0.5), ImVec2(0.1, 0.1), ImVec2(0.9, 0.1), ImVec2(0.9, 0.9), ImVec2(0.1, 0.9)}) {
-                float ii = i + offset.x;
-                float jj = j + offset.y;
-                float u = camera->mid_res[X] - ii;
-                float v = camera->mid_res[Y] - jj;
-
-                Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
-
-                Ray ray = Ray(camera->position, rayDir, camera->max_depth);
-                Color new_color = EvaluateRay(ray);
-                new_color.Clamp();
-                col = col + (new_color * 0.25);
-            }
+            offsets = {ImVec2(0.50, 0.50), ImVec2(0.15, 0.15), ImVec2(0.85, 0.15), ImVec2(0.85, 0.85),
+                       ImVec2(0.15, 0.85)};
 #elif SAMPLING == 0
-            float u = camera->mid_res[X] - i + 0.5;
-            float v = camera->mid_res[Y] - j + 0.5;
-
-            Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
-
-            Ray ray = Ray(camera->position, rayDir, camera->max_depth);
-            Color col = EvaluateRay(ray);
+            offsets = {ImVec2(0.5, 0.5)};
 #else
+            for (int samp_i = 0; samp_i < SAMPLING; samp_i++)
+                offsets.push_back(ImVec2(randf(), randf()));
+#endif
             Color col = Color(0, 0, 0);
-            Color last_color;
-            for (int samp_i = 0; samp_i < SAMPLING; samp_i++) {
-                float ii = i + rand() / (float) RAND_MAX;
-                float jj = j + rand() / (float) RAND_MAX;
-                float u = camera->mid_res[X] - ii;
-                float v = camera->mid_res[Y] - jj;
+            for (ImVec2 offset : offsets) {
+                float u = camera->mid_res[X] - i + offset.x;
+                float v = camera->mid_res[Y] - j + offset.y;
 
                 Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
 
                 Ray ray = Ray(camera->position, rayDir, camera->max_depth);
                 Color new_color = EvaluateRay(ray);
                 new_color.Clamp();
-                col = col + (new_color * 0.25);
+                col = col + new_color * (1.0 / offsets.size());
             }
-#endif
             outputImg.setPixel(i, j, col);
         }
     }
@@ -741,12 +705,11 @@ void Render() {
         light->ClampColor();
     }
 
-	// TODO: Instead of displaying image, write to a buffer.
+    // TODO: Instead of displaying image, write to a buffer.
     string relative_output_name = "output/" + string(output_name);
     outputImg.write(relative_output_name.c_str());
     DisplayImage(relative_output_name);
 }
-
 
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection) {
     HitInformation current_inter;
@@ -761,7 +724,6 @@ bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* inter
     }
     return dist != -1.0;
 }
-
 
 // From Dear ImGui wiki
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height) {
@@ -780,8 +742,9 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_wid
     // Setup filtering parameters for display
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                    GL_CLAMP_TO_EDGE);  // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);  // Same
 
     // Upload pixels into texture
 #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
@@ -804,7 +767,7 @@ void DisplayImage(string name) {
     IM_ASSERT(ret);
 }
 
-} //  namespace P3
+}  //  namespace P3
 
 using namespace P3;
 
@@ -827,11 +790,13 @@ int main(int argc, char** argv) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Project 3, Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    SDL_WindowFlags window_flags =
+        (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_Window* window = SDL_CreateWindow("Project 3, Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280,
+                                          720, window_flags);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1); // Enable vsync
+    SDL_GL_SetSwapInterval(1);  // Enable vsync
 
     // Initialize OpenGL loader
     int err = gladLoadGL();
@@ -843,7 +808,8 @@ int main(int argc, char** argv) {
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
+    (void)io;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -863,7 +829,8 @@ int main(int argc, char** argv) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT)
                 done = true;
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
+                event.window.windowID == SDL_GetWindowID(window))
                 done = true;
         }
 
@@ -871,7 +838,6 @@ int main(int argc, char** argv) {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
-
 
         ImGui::Begin("Renderer Settings");
 
@@ -890,11 +856,11 @@ int main(int argc, char** argv) {
         ImGui::InputTextWithHint("", "<scene filename>", scene_name, 256, ImGuiInputTextFlags_CharsNoBlank);
         ImGui::InputTextWithHint("Output Name", "output.png", output_name, 256, ImGuiInputTextFlags_CharsNoBlank);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
-        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.7, 0.7, 1.0, 1.0});
+        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{0.4, 0.4, 0.5, 1.0});
         camera->ImGui();
         ImGui::PopStyleColor(2);
-        
+
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 0.7, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Geometry")) {
             for (Geometry* shape : shapes) {
@@ -908,25 +874,25 @@ int main(int argc, char** argv) {
         }
         ImGui::PopStyleColor();
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0});
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 1.0, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Lighting")) {
             float spacing = 4.0f;
             for (Light* light : lights) {
                 light->ImGui();
             }
-            if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
+            if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
                 lights.push_back(new AmbientLight());
             }
             ImGui::SameLine(0.0f, spacing);
-            if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
+            if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
                 lights.push_back(new PointLight());
             }
             ImGui::SameLine(0.0f, spacing);
-            if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
+            if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
                 lights.push_back(new SpotLight());
             }
             ImGui::SameLine(0.0f, spacing);
-            if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
+            if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
                 lights.push_back(new DirectionalLight());
             }
         }
@@ -937,8 +903,6 @@ int main(int argc, char** argv) {
             ImGui::Image((void*)(intptr_t)disp_img_tex, disp_img_size);
             ImGui::End();
         }
-
-
 
         ImGui::End();
 
