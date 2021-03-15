@@ -1,34 +1,33 @@
 #pragma once
 
 #include "imgui.h"
-#include "PGA_3D.h"
-#include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
+#include "backends/imgui_impl_sdl.h"
 #include <stdio.h>
 #include <SDL.h>
-#include <string>
-#include <vector>
+#include <direct.h>
+#include <glad/glad.h>
+#include <algorithm>
 #include <array>
+#include <fstream>
 #include <iostream>
 #include <sstream>
-#include <fstream>
-#include <algorithm>
-#include <direct.h>
+#include <string>
+#include <vector>
+#include "PGA_3D.h"
+#include "image_lib.h"
 
-using std::string;
-using std::vector;
 using std::array;
 using std::cout;
 using std::endl;
 using std::ifstream;
 using std::ofstream;
+using std::string;
 using std::stringstream;
-
-#include <glad/glad.h>          // Initialize with gladLoadGL()
+using std::vector;
 
 #define X 0
 #define Y 1
-
 
 namespace P3 {
 
@@ -41,155 +40,41 @@ struct Light;
 // Pseudo: if prefix_matches ? string_without_prefix : "";
 string rest_if_prefix(const string prefix, string content);
 
+struct Ray {
+    Point3D pos;
+    Dir3D dir;
+    int bounces_left;
 
-struct UIObject {
+    Ray(Point3D p, Dir3D d, int b) : pos(p), dir(d.normalized()), bounces_left(b) {}
+};
+
+struct HitInformation {
+    float dist;
+    Point3D pos;
+    Dir3D viewing;
+    Dir3D normal;
+    Material* material;
+};
+
+// Non-enforced abstract class for raytracer objects. These are both UI objects,
+// and entities.
+struct Object {
     int id;
 
     // Call with id to create new
-    UIObject();
+    Object();
     // Call with id to replace
-    UIObject(int old_id);
+    Object(int old_id);
 
-    virtual void ImGui() { }
+    virtual void ImGui() {}
     virtual string Encode() { return ""; }
-    virtual void Decode(string& s) { }
+    virtual void Decode(string& s) {}
 
     string WithId(string s);
-    bool operator==(UIObject rhs) { return id == rhs.id; }
+    bool operator==(Object rhs) { return id == rhs.id; }
 };
 
-
-struct UICamera : UIObject {
-    float cp[3]{ 0.0f, 0.0f, 0.0f };
-    float cf[3]{ 0.0f, 0.0f, 1.0f };
-    float cu[3]{ 0.0f, 1.0f, 0.0f };
-    float bc[3]{ 0.0f, 0.0f, 0.0f };
-    float fov_ha = 45.0f;
-    int window_res[2]{ 640, 480 };
-    int max_depth = 5;
-
-    using UIObject::UIObject;
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s); // Camera decode takes in the whole line, instead of post key, as it is multiline.
-};
-
-
-struct UIMaterial : UIObject{
-    float ambient[3]{ 0.0f, 0.0f, 0.0f };
-    float diffuse[3]{ 0.0f, 0.0f, 0.0f };
-    float specular[3]{ 0.0f, 0.0f, 0.0f };
-    float transmissive[3]{ 0.0f, 0.0f, 0.0f };
-    float phong = 0.0f;
-    float ior = 0.0f;
-
-    using UIObject::UIObject;
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-
-// This only needs to exist in preperation for other Geometry primitives.
-struct UIGeometry : UIObject {
-    UIMaterial* mat;
-
-    UIGeometry();
-    UIGeometry(int old_id);
-
-    vector<UIGeometry*>::iterator GetIter();
-    void Delete();
-
-    virtual Geometry* ToGeometry();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-struct UISphere : UIGeometry {
-    float pos[3]{ 0.0f, 0.0f, 0.0f };
-    float rad = 1.0f;
-
-    using UIGeometry::UIGeometry;
-
-    Geometry* ToGeometry();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-
-struct UILight : UIObject {
-    float col[3] = { 0.0f, 0.0f, 0.0f };
-    float mult = 1.0;
-
-    using UIObject::UIObject;
-
-    virtual Light* ToLight();
-
-    vector<UILight*>::iterator GetIter();
-    void Delete();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-struct UIAmbientLight : UILight {
-    using UILight::UILight;
-
-    Light* ToLight();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-struct UIPointLight : UILight {
-    float pos[3] = { 0.0f, 0.0f, 0.0f };
-
-    using UILight::UILight;
-
-    Light* ToLight();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-struct UIDirectionalLight : UILight {
-    float dir[3] = { 0.0f, 0.0f, 0.0f };
-
-    using UILight::UILight;
-
-    Light* ToLight();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-struct UISpotLight : UILight {
-    float pos[3] = { 0.0f, 0.0f, 0.0f };
-    float dir[3] = { 0.0f, 0.0f, 0.0f };
-    float angle1 = 0.0f;
-    float angle2 = 0.0f;
-
-    using UILight::UILight;
-
-    Light* ToLight();
-
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
-};
-
-
-struct Material {
+struct Material : Object {
     Color ambient = Color();
     Color diffuse = Color();
     Color specular = Color();
@@ -197,37 +82,15 @@ struct Material {
     float phong = 0.0f;
     float ior = 0.0f;
 
-    Material() { }
-    Material(UIMaterial* from);
+    using Object::Object;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 };
 
 
-struct HitInformation {
-    float dist;
-    Point3D pos;
-    Dir3D viewing;
-    Dir3D normal;
-
-    Material material;
-};
-
-struct Ray {
-    Point3D pos;
-    Dir3D dir;
-    int bounces_left;
-
-    Ray(Point3D p, Dir3D d, int b) : pos(p), dir(d.normalized()), bounces_left(b) { }
-};
-
-Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left);
-Color EvaluateRay(Ray ray);
-Color CalculateDiffuse(Light* light, HitInformation hit);
-Color CalculateSpecular(Light* light, HitInformation hit);
-Color CalculateAmbient(HitInformation hit);
-
-
-
-struct Camera {
+struct Camera : Object {
     Point3D position;
     Dir3D forward, up, right;
     Color background_color;
@@ -236,67 +99,98 @@ struct Camera {
     array<int, 2> mid_res;
     int max_depth = 5;
 
-    Camera(UICamera* from);
+    using Object::Object;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 };
 
+struct Geometry : Object {
+    Material* material;
 
-struct Geometry {
-    Material material; // Pointer not necessary
+    Geometry();
+    Geometry(int old_id);
 
-    Geometry(UIGeometry* from);
+    vector<Geometry*>::iterator Geometry::GetIter();
+    void Delete();
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 
     virtual bool FindIntersection(Ray ray, HitInformation* intersection) { return false; }
 };
-
 
 struct Sphere : Geometry {
     Point3D position;
     float radius;
 
-    Sphere(UISphere* from);
+    using Geometry::Geometry;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 
     bool FindIntersection(Ray ray, HitInformation* intersection);
 };
 
-
-struct Light {
+// Non-enforced abstract class for lights
+struct Light : Object {
     Color color;
+	float mult;
+    void UpdateMult();
+    void ClampColor();
 
-    Light(UILight* from);
+    using Object::Object;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
+    vector<Light*>::iterator Light::GetIter();
+    void Delete();
 
     // Non-enforced abstract
     virtual Ray ReverseLightRay(Point3D from) { return Ray(Point3D(), Dir3D(), -1); }
     virtual float DistanceTo(Point3D to) { return -1.0f; }
-    virtual Color Intensity(Point3D to) { return Color(); }
+    virtual Color Intensity(Point3D to) { return Color(0, 0, 0); }
 };
-
 
 struct AmbientLight : Light {
-    AmbientLight(UIAmbientLight* from) : Light(from) { }
-};
+    using Light::Light;
 
+	void ImGui();
+    string Encode();
+    void Decode(string& s);
+};
 
 struct DirectionalLight : Light {
     Dir3D direction;
 
-    DirectionalLight(UIDirectionalLight* from);
+    using Light::Light;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 
     Ray ReverseLightRay(Point3D from);
     float DistanceTo(Point3D to);
     Color Intensity(Point3D to);
 };
-
 
 struct PointLight : Light {
     Point3D position;
 
-    PointLight(UIPointLight* from);
+    using Light::Light;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 
     Ray ReverseLightRay(Point3D from);
     float DistanceTo(Point3D to);
     Color Intensity(Point3D to);
 };
-
 
 struct SpotLight : Light {
     Point3D position;
@@ -304,13 +198,22 @@ struct SpotLight : Light {
     float angle1;
     float angle2;
 
-    SpotLight(UISpotLight* from);
+    using Light::Light;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
 
     Ray ReverseLightRay(Point3D from);
     float DistanceTo(Point3D to);
     Color Intensity(Point3D to);
 };
 
+Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left);
+Color EvaluateRay(Ray ray);
+Color CalculateDiffuse(Light* light, HitInformation hit);
+Color CalculateSpecular(Light* light, HitInformation hit);
+Color CalculateAmbient(HitInformation hit);
 
 void Reset();
 void Load();
@@ -322,4 +225,4 @@ void DisplayImage(string name);
 
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 
-}
+}  // namespace P3

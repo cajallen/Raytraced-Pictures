@@ -1,10 +1,4 @@
 // Main templated from Dear ImGui
-
-//#define _USE_MATH_DEFINES
-#include <stdint.h>
-#define STB_IMAGE_IMPLEMENTATION //only place once in one .cpp file
-#define STB_IMAGE_WRITE_IMPLEMENTATION //only place once in one .cpp files
-#include "image_lib.h"
 #include "main.h"
 
 #define AA_NONE 0
@@ -19,21 +13,16 @@ namespace P3 {
 char output_name[256] = "raytraced.bmp";
 
 // UI STATE
-vector<UIGeometry*> ui_shapes{};
-vector<UILight*> ui_lights{};
-vector<UIMaterial*> ui_materials{ new UIMaterial() };
-UICamera* ui_camera = new UICamera();
+vector<Geometry*> shapes{};
+vector<Light*> lights{};
+vector<AmbientLight*> ambient_lights{};
+vector<Material*> materials{ new Material() };
+Camera* camera = new Camera();
 int entity_count = 0;
 char scene_name[256] = "";
 
 ImVec2 disp_img_size{ 0.0, 0.0 };
 GLuint disp_img_tex = -1;
-
-// RENDER STATE
-Camera* camera;
-vector<Geometry*> geometry;
-vector<Light*> lights;
-vector<AmbientLight*> ambient;
 
 
 string rest_if_prefix(const string prefix, string content) {
@@ -58,76 +47,81 @@ Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left) {
 }
 
 
-UIObject::UIObject() {
+Object::Object() {
     id = entity_count;
     entity_count++;
 }
 
-UIObject::UIObject(int old_id) {
+Object::Object(int old_id) {
     id = old_id;
 }
 
 
-string UIObject::WithId(string s) {
+string Object::WithId(string s) {
     return (s + std::to_string(id)).c_str();
 }
 
 
-// Call without index to create new ui_shapes
-UIGeometry::UIGeometry() : UIObject() {
-    mat = ui_materials.back();
+// Call without index to create new shapes
+Geometry::Geometry() : Object() {
+    material = materials.back();
 }
-// Call with index to replace ui_shapes (use old id)
-UIGeometry::UIGeometry(int old_id) : UIObject(old_id) {
-    mat = ui_materials.back();
+// Call with index to replace shapes (use old id)
+Geometry::Geometry(int old_id) : Object(old_id) {
+    material = materials.back();
 }
 
 
-void UIGeometry::Delete() { ui_shapes.erase(GetIter()); }
-void UILight::Delete() { ui_lights.erase(GetIter()); }
+void Geometry::Delete() { shapes.erase(GetIter()); }
+void Light::Delete() { lights.erase(GetIter()); }
 
 
-vector<UIGeometry*>::iterator UIGeometry::GetIter() {
-    for (vector<UIGeometry*>::iterator it = ui_shapes.begin(); it < ui_shapes.end(); it++) {
+vector<Geometry*>::iterator Geometry::GetIter() {
+    for (vector<Geometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
         if ((*it)->id == id) {
             return it;
         }
     }
-    cout << "Geometry not found in ui_shapes" << endl;
-    return ui_shapes.end();
+    cout << "Geometry not found in shapes" << endl;
+    return shapes.end();
 }
 
 
-vector<UILight*>::iterator UILight::GetIter() {
-    for (vector<UILight*>::iterator it = ui_lights.begin(); it < ui_lights.end(); it++) {
+vector<Light*>::iterator Light::GetIter() {
+    for (vector<Light*>::iterator it = lights.begin(); it < lights.end(); it++) {
         if ((*it)->id == id) {
             return it;
         }
     }
-    cout << "Light not found in ui_lights" << endl;
-    return ui_lights.end();
+    cout << "Light not found in lights" << endl;
+    return lights.end();
 }
 
 
-void UICamera::ImGui() {
+void Camera::ImGui() {
     if (ImGui::CollapsingHeader("Camera Parameters")) {
-        ImGui::DragFloat3("Camera Position", cp, 0.1);
-        ImGui::SliderFloat3("Camera Forward", cf, -1.0f, 1.0f);
-        ImGui::SliderFloat3("Camera Up", cu, -1.0f, 1.0f);
-        ImGui::SliderFloat("FOV", &fov_ha, 0.0f, 90.0f);
-        ImGui::DragInt2("Resolution", window_res, 1);
+        ImGui::DragFloat3("Camera Position", &position.x, 0.1);
+        ImGui::SliderFloat3("Camera Forward", &forward.x, -1.0f, 1.0f);
+        ImGui::SliderFloat3("Camera Up", &up.x, -1.0f, 1.0f);
+        ImGui::SliderFloat("FOV", &half_vfov, 0.0f, 90.0f);
+        ImGui::DragInt2("Resolution", &res[0], 1);
         ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
-        ImGui::ColorPicker3("Background Color", bc);
+        ImGui::ColorPicker3("Background Color", &background_color.r);
     }
+    mid_res = { res[X] / 2, res[Y] / 2 };
+
+    forward = forward.normalized();
+    right = cross(up, forward).normalized();
+    up = cross(forward, right).normalized();
 }
 
-void UIGeometry::ImGui() {
+void Geometry::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Geometry ").c_str())) {
         if (ImGui::Button(WithId("Sphere").c_str())) {
             auto iter = GetIter();
-            UIGeometry* old = *iter;
-            *iter = new UISphere(id);
+            Geometry* old = *iter;
+            *iter = new Sphere(id);
             delete old;
         }
         if (ImGui::Button(WithId("Delete##").c_str())) {
@@ -137,13 +131,13 @@ void UIGeometry::ImGui() {
     ImGui::Unindent(6.0f);
 }
 
-void UISphere::ImGui() {
+void Sphere::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Sphere ").c_str())) {
-        ImGui::DragFloat3(WithId("pos##").c_str(), pos, 0.02);
-        ImGui::DragFloat(WithId("radius##").c_str(), &rad, 0.01, 0.01);
+        ImGui::DragFloat3(WithId("pos##").c_str(), &position.x, 0.02);
+        ImGui::DragFloat(WithId("radius##").c_str(), &radius, 0.01, 0.01);
         ImGui::Indent(3.0f);
-        mat->ImGui();
+        material->ImGui();
         ImGui::Unindent(3.0f);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
@@ -153,25 +147,23 @@ void UISphere::ImGui() {
 }
 
 
-void UIMaterial::ImGui() {
-    // TODO: "Make Unique" button
+void Material::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Material ").c_str())) {
         ImGui::Indent(4.0f);
-        ImGui::SliderFloat3(WithId("ambient##").c_str(), ambient, 0.0f, 1.0f);
-        ImGui::SliderFloat3(WithId("diffuse##").c_str(), diffuse, 0.0f, 1.0f);
-        ImGui::SliderFloat3(WithId("specular##").c_str(), specular, 0.0f, 1.0f);
-        ImGui::SliderFloat3(WithId("transmissive##").c_str(), transmissive, 0.0f, 1.0f);
-        ImGui::SliderFloat(WithId("phong##").c_str(), &phong, 0.0f, 10.0f);
+        ImGui::SliderFloat3(WithId("ambient##").c_str(), &ambient.r, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("diffuse##").c_str(), &diffuse.r, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("specular##").c_str(), &specular.r, 0.0f, 1.0f);
+        ImGui::SliderFloat3(WithId("transmissive##").c_str(), &transmissive.r, 0.0f, 1.0f);
+        ImGui::SliderFloat(WithId("phong##").c_str(), &phong, 0.0f, 50.0f, "%.1f", ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat(WithId("ior##").c_str(), &ior, 0.0f, 1.0f);
         ImGui::Unindent(4.0f);
     }
 }
 
 
-void UILight::ImGui() {
+void Light::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Light ").c_str())) {
-        ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -179,12 +171,11 @@ void UILight::ImGui() {
     ImGui::Unindent(6.0f);
 }
 
-
-void UIAmbientLight::ImGui() {
+void AmbientLight::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
         ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
-        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -192,12 +183,12 @@ void UIAmbientLight::ImGui() {
     ImGui::Unindent(6.0f);
 }
 
-void UIPointLight::ImGui() {
+void PointLight::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
-        ImGui::DragFloat3(WithId("pos##").c_str(), pos, 0.1);
+        ImGui::DragFloat3(WithId("pos##").c_str(), &position.x, 0.1);
         ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
-        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -205,16 +196,16 @@ void UIPointLight::ImGui() {
     ImGui::Unindent(6.0f);
 }
 
-void UISpotLight::ImGui() {
+void SpotLight::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Spot ").c_str())) {
-        ImGui::DragFloat3(WithId("pos##").c_str(), pos, 0.1);
-        ImGui::SliderFloat3(WithId("dir##").c_str(), dir, -1, 1);
+        ImGui::DragFloat3(WithId("pos##").c_str(), &position.x, 0.1);
+        ImGui::SliderFloat3(WithId("dir##").c_str(), &direction.x, -1, 1);
         ImGui::SliderFloat(WithId("interior_angle##").c_str(), &angle1, 0, 90);
         angle2 = max(angle1, angle2);
         ImGui::SliderFloat(WithId("exterior_angle##").c_str(), &angle2, angle1, 90);
         ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
-        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -222,12 +213,12 @@ void UISpotLight::ImGui() {
     ImGui::Unindent(6.0f);
 }
 
-void UIDirectionalLight::ImGui() {
+void DirectionalLight::ImGui() {
     ImGui::Indent(6.0f);
     if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
         ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
-        ImGui::DragFloat3(WithId("direction##").c_str(), dir, 0.01, -1.0, 1.0);
-        ImGui::ColorPicker3(WithId("color##").c_str(), col);
+        ImGui::DragFloat3(WithId("direction##").c_str(), &direction.x, 0.01, -1.0, 1.0);
+        ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -236,36 +227,36 @@ void UIDirectionalLight::ImGui() {
 }
 
 
-void UICamera::Decode(string& s) {
+void Camera::Decode(string& s) {
     string rest;
     rest = rest_if_prefix("camera_pos: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> cp[0] >> cp[1] >> cp[2];
+        ss >> position.x >> position.y >> position.z;
     }
 
     rest = rest_if_prefix("camera_fwd: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> cf[0] >> cf[1] >> cf[2];
+        ss >> forward.x >> forward.y >> forward.z;
     }
 
     rest = rest_if_prefix("camera_up: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> cu[0] >> cu[1] >> cu[2];
+        ss >> up.x >> up.y >> up.z;
     }
 
     rest = rest_if_prefix("camera_fov_ha: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> fov_ha;
+        ss >> half_vfov;
     }
 
     rest = rest_if_prefix("film_resolution: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> window_res[0] >> window_res[1];
+        ss >> res[0] >> res[1];
     }
 
     rest = rest_if_prefix("output_image: ", s);
@@ -277,7 +268,7 @@ void UICamera::Decode(string& s) {
     rest = rest_if_prefix("background: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> bc[0] >> bc[1] >> bc[2];
+        ss >> background_color.r >> background_color.g >> background_color.b;
     }
 
     rest = rest_if_prefix("max_depth: ", s);
@@ -288,225 +279,144 @@ void UICamera::Decode(string& s) {
 }
 
 
-void UIMaterial::Decode(string& s) {
+void Material::Decode(string& s) {
     stringstream ss(s);
-    ss >> ambient[0] >> ambient[1] >> ambient[2] >>
-        diffuse[0] >> diffuse[1] >> diffuse[2] >>
-        specular[0] >> specular[1] >> specular[2] >> phong >>
-        transmissive[0] >> transmissive[1] >> transmissive[2] >> ior;
+    ss >> ambient.r >> ambient.g >> ambient.b >>
+        diffuse.r >> diffuse.g >> diffuse.b >>
+        specular.r >> specular.g >> specular.b >> phong >>
+        transmissive.r >> transmissive.g >> transmissive.b >> ior;
 }
 
-void UIGeometry::Decode(string& s) {
+void Geometry::Decode(string& s) {
 }
 
 
-void UISphere::Decode(string& s) {
+void Sphere::Decode(string& s) {
     stringstream ss(s);
-    ss >> pos[0] >> pos[1] >> pos[2] >> rad;
+    ss >> position.x >> position.y >> position.z >> radius;
 }
 
-void UILight::Decode(string& s) {
+void Light::Decode(string& s) {
     stringstream ss(s);
-    ss >> col[0] >> col[1] >> col[2];
-    if (col[0] > 1 || col[1] > 1 || col[2] > 1) {
-        float max_col = max(col[0], max(col[1], col[2]));
-        mult = max_col;
-        col[0] /= mult;
-        col[1] /= mult;
-        col[2] /= mult;
-    }
+    ss >> color.r >> color.g >> color.b;
+    ClampColor();
 
     getline(ss, s);
 }
 
-void UIAmbientLight::Decode(string& s) {
-    UILight::Decode(s);
+void AmbientLight::Decode(string& s) {
+    Light::Decode(s);
 }
 
-void UIPointLight::Decode(string& s) {
-    UILight::Decode(s);
+void PointLight::Decode(string& s) {
+    Light::Decode(s);
     stringstream ss(s);
-    ss >> pos[0] >> pos[1] >> pos[2];
+    ss >> position.x >> position.y >> position.z;
 }
 
-void UIDirectionalLight::Decode(string& s) {
-    UILight::Decode(s);
+void DirectionalLight::Decode(string& s) {
+    Light::Decode(s);
     stringstream ss(s);
-    ss >> dir[0] >> dir[1] >> dir[2];
+    ss >> direction.x >> direction.y >> direction.z;
 }
 
-void UISpotLight::Decode(string& s) {
-    UILight::Decode(s);
+void SpotLight::Decode(string& s) {
+    Light::Decode(s);
     stringstream ss(s);
-    ss >> pos[0] >> pos[1] >> pos[2] >> dir[0] >> dir[1] >> dir[2] >> angle1 >> angle2;
+    ss >> position.x >> position.y >> position.z >> direction.x >> direction.y >> direction.z >> angle1 >> angle2;
 }
 
 
-string UICamera::Encode() {
+string Camera::Encode() {
     stringstream ss;
 
-    ss << "camera_pos: " << cp[0] << " " << cp[1] << " " << cp[2] << " " << endl;
-    ss << "camera_fwd: " << cf[0] << " " << cf[1] << " " << cf[2] << " " << endl;
-    ss << "camera_up: " << cu[0] << " " << cu[1] << " " << cu[2] << " " << endl;
-    ss << "camera_fov_ha: " << fov_ha << endl;
-    ss << "film_resolution: " << window_res[0] << " " << window_res[1] << endl;
+    ss << "camera_pos: " << position.x << " " << position.y << " " << position.z << " " << endl;
+    ss << "camera_fwd: " << forward.x << " " << forward.y << " " << forward.z << " " << endl;
+    ss << "camera_up: " << up.x << " " << up.y << " " << up.z << " " << endl;
+    ss << "camera_fov_ha: " << half_vfov << endl;
+    ss << "film_resolution: " << res[0] << " " << res[1] << endl;
     ss << "output_image: " << output_name << endl;
-    ss << "background: " << bc[0] << " " << bc[1] << " " << bc[2] << " " << endl;
+    ss << "background: " << background_color.r << " " << background_color.g << " " << background_color.b << " " << endl;
     ss << "max_depth: " << max_depth << endl;
 
     return ss.str();
 }
 
 
-string UIMaterial::Encode() {
+string Material::Encode() {
     char temp[256];
     sprintf(temp, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f",
-        ambient[0], ambient[1], ambient[2],
-        diffuse[0], diffuse[1], diffuse[2],
-        specular[0], specular[1], specular[2], phong,
-        transmissive[0], transmissive[1], transmissive[2], ior);
+        ambient.r, ambient.g, ambient.b,
+        diffuse.r, diffuse.g, diffuse.b,
+        specular.r, specular.g, specular.b, phong,
+        transmissive.r, transmissive.g, transmissive.b, ior);
 
     return string(temp);
 }
 
-string UIGeometry::Encode() {
-    return string("material: ") + mat->Encode() + string("\n");
+string Geometry::Encode() {
+    return string("material: ") + material->Encode() + string("\n");
 }
 
-string UISphere::Encode() {
+string Sphere::Encode() {
     char temp[256];
-    sprintf(temp, "sphere: %f %f %f %f", pos[0], pos[1], pos[2], rad);
+    sprintf(temp, "sphere: %f %f %f %f", position.x, position.y, position.z, radius);
 
-    return UIGeometry::Encode() + string(temp);
+    return Geometry::Encode() + string(temp);
 }
 
-string UILight::Encode() {
+string Light::Encode() {
     char temp[256];
-    sprintf(temp, "%f %f %f", col[0] * mult, col[1] * mult, col[2] * mult);
+    sprintf(temp, "%f %f %f", color.r * mult, color.g * mult, color.b * mult);
 
     return string(temp);
 }
 
-string UIAmbientLight::Encode() {
+string AmbientLight::Encode() {
     stringstream ss;
-    ss << "ambient_light: " << UILight::Encode();
+    ss << "ambient_light: " << Light::Encode();
 
     return ss.str();
 }
 
-string UIDirectionalLight::Encode() {
+string DirectionalLight::Encode() {
     stringstream ss;
-    ss << "directional_light: " << UILight::Encode() << " " << dir[0] << " " << dir[1] << " " << dir[2];
+    ss << "directional_light: " << Light::Encode() << " " << direction.x << " " << direction.y << " " << direction.z;
 
     return ss.str();
 }
 
-string UIPointLight::Encode() {
+string PointLight::Encode() {
     stringstream ss;
-    ss << "point_light: " << UILight::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2];
+    ss << "point_light: " << Light::Encode() << " " << position.x << " " << position.y << " " << position.z;
 
     return ss.str();
 }
 
-string UISpotLight::Encode() {
+string SpotLight::Encode() {
     stringstream ss;
-    ss << "spot_light: " << UILight::Encode() << " " << pos[0] << " " << pos[1] << " " << pos[2] << " " <<dir[0] << " " << dir[1] << " " << dir[2] << " " << angle1 << " " << angle2;
+    ss << "spot_light: " << Light::Encode() << " " << position.x << " " << position.y << " " << position.z <<
+			" " << direction.x << " " << direction.y << " " << direction.z << " " << angle1 << " " << angle2;
 
     return ss.str();
 }
 
 
-Geometry* UIGeometry::ToGeometry() {
-    return new Geometry(this);
-}
-
-Geometry* UISphere::ToGeometry() {
-    return new Sphere(this);
+void Light::UpdateMult() {
+    color = color * mult;
+    mult = 1;
 }
 
 
-Light* UILight::ToLight() {
-    return new Light(this);
+void Light::ClampColor() {
+    if (color.r > 1 || color.g > 1 || color.b > 1) {
+        float max_col = max(color.r, max(color.g, color.b));
+        mult = max_col;
+        color.r /= mult;
+        color.g /= mult;
+        color.b /= mult;
+    }
 }
-
-
-Light* UIAmbientLight::ToLight() {
-    return new AmbientLight(this);
-}
-
-
-Light* UIDirectionalLight::ToLight() {
-    return new DirectionalLight(this);
-}
-
-
-Light* UIPointLight::ToLight() {
-    return new PointLight(this);
-}
-
-Light* UISpotLight::ToLight() {
-    return new SpotLight(this);
-}
-
-
-Camera::Camera(UICamera* from) {
-    position = Point3D(from->cp[0], from->cp[1], from->cp[2]);
-    background_color = Color(from->bc[0], from->bc[1], from->bc[2]);
-    half_vfov = from->fov_ha;
-    res = {from->window_res[X], from->window_res[Y]};
-    mid_res = { res[X]/2, res[Y]/2 };
-    max_depth = from->max_depth;
-
-    forward = Dir3D(from->cf[0], from->cf[1], from->cf[2]).normalized();
-    up = Dir3D(from->cu[0], from->cu[1], from->cu[2]);
-    right = cross(up, forward).normalized();
-    up = cross(forward, right).normalized();
-}
-
-
-Material::Material(UIMaterial* from) {
-    ambient = Color(from->ambient[0], from->ambient[1], from->ambient[2]);
-    diffuse = Color(from->diffuse[0], from->diffuse[1], from->diffuse[2]);
-    specular = Color(from->specular[0], from->specular[1], from->specular[2]);
-    transmissive = Color(from->transmissive[0], from->transmissive[1], from->transmissive[2]);
-    phong = from->phong;
-    ior = from->ior;
-}
-
-
-Geometry::Geometry(UIGeometry* from) {
-    material = Material(from->mat);
-}
-
-
-Sphere::Sphere(UISphere* from) : Geometry(from) {
-    position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
-    radius = from->rad;
-}
-
-
-Light::Light(UILight* from) {
-    float m = from->mult;
-    color = Color(from->col[0] * m, from->col[1] * m, from->col[2] * m);
-}
-
-DirectionalLight::DirectionalLight(UIDirectionalLight* from) : Light(from) {
-    direction = Dir3D(from->dir[0], from->dir[1], from->dir[2]);
-}
-
-PointLight::PointLight(UIPointLight* from) : Light(from) {
-    position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
-}
-
-SpotLight::SpotLight(UISpotLight* from) : Light(from) {
-    position = Point3D(from->pos[0], from->pos[1], from->pos[2]);
-    direction = Dir3D(from->dir[0], from->dir[1], from->dir[2]).normalized();
-
-    angle1 = from->angle1;
-    angle2 = from->angle2;
-}
-
-
 
 
 bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
@@ -594,25 +504,26 @@ Color SpotLight::Intensity(Point3D to) {
 
 
 void Reset() {
-    delete ui_camera;
-    for (UIGeometry* o : ui_shapes) {
+    delete camera;
+    for (Geometry* o : shapes) {
         delete o;
     }
-    for (UILight* o : ui_lights) {
+    for (Light* o : lights) {
         delete o;
     }
-    for (UIMaterial* o : ui_materials) {
+    for (Material* o : materials) {
         delete o;
     }
-    ui_shapes.clear();
-    ui_lights.clear();
-    ui_materials.clear();
+    shapes.clear();
+    lights.clear();
+    ambient_lights.clear();
+    materials.clear();
 
     strcpy(output_name, "");
 
     entity_count = 0;
-    ui_materials.push_back(new UIMaterial());
-    ui_camera = new UICamera();
+    materials.push_back(new Material());
+    camera = new Camera();
 }
 
 
@@ -628,50 +539,49 @@ void Load() {
     while (getline(scene_file, line)) {
         string rest;
 
-        // TODO: Should this be the syntax for all Decode calls?
-        // Probably lol...
-        ui_camera->Decode(line);
+        // Only camera can Decode this way because only camera is pseudostatic
+        camera->Decode(line);
 
         rest = rest_if_prefix("sphere: ", line);
         if (rest != "") {
-            UISphere* new_sphere = new UISphere();
+            Sphere* new_sphere = new Sphere();
             new_sphere->Decode(rest);
-            ui_shapes.push_back(new_sphere);
+            shapes.push_back(new_sphere);
         }
 
         rest = rest_if_prefix("material: ", line);
         if (rest != "") {
-            UIMaterial* new_mat = new UIMaterial();
+            Material* new_mat = new Material();
             new_mat->Decode(rest);
-            ui_materials.push_back(new_mat);
+            materials.push_back(new_mat);
         }
 
         rest = rest_if_prefix("ambient_light: ", line);
         if (rest != "") {
-            UIAmbientLight* new_light = new UIAmbientLight();
+            AmbientLight* new_light = new AmbientLight();
             new_light->Decode(rest);
-            ui_lights.push_back(new_light);
+            lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("directional_light: ", line);
         if (rest != "") {
-            UIDirectionalLight* new_light = new UIDirectionalLight();
+            DirectionalLight* new_light = new DirectionalLight();
             new_light->Decode(rest);
-            ui_lights.push_back(new_light);
+            lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("point_light: ", line);
         if (rest != "") {
-            UIPointLight* new_light = new UIPointLight();
+            PointLight* new_light = new PointLight();
             new_light->Decode(rest);
-            ui_lights.push_back(new_light);
+            lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("spot_light: ", line);
         if (rest != "") {
-            UISpotLight* new_light = new UISpotLight();
+            SpotLight* new_light = new SpotLight();
             new_light->Decode(rest);
-            ui_lights.push_back(new_light);
+            lights.push_back(new_light);
         }
     }
     scene_file.close();
@@ -688,13 +598,13 @@ void Save() {
     ofstream scene_file(scene_string);
     if (!scene_file.is_open()) { return; }
 
-    scene_file << ui_camera->Encode() << endl;
+    scene_file << camera->Encode() << endl;
 
-    for (UIGeometry* geo : ui_shapes) {
+    for (Geometry* geo : shapes) {
         scene_file << geo->Encode() << endl;
     }
 
-    for (UILight* light : ui_lights) {
+    for (Light* light : lights) {
         scene_file << light->Encode() << endl;
     }
 
@@ -706,17 +616,19 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
 
     for (Light* light : lights) {
+        if (light->Intensity(hit_info.pos) == Color(0, 0, 0)) continue;
+
         Ray to_light = light->ReverseLightRay(hit_info.pos);
         to_light.pos = to_light.pos + hit_info.normal * 0.0001;
         HitInformation light_intersection;
         // If light is blocked
-        if (FindIntersection(geometry, to_light, &light_intersection) && light_intersection.dist < light->DistanceTo(hit_info.pos)) continue;
+        if (FindIntersection(shapes, to_light, &light_intersection) && light_intersection.dist < light->DistanceTo(hit_info.pos)) continue;
 
         current = current + CalculateDiffuse(light, hit_info);
         current = current + CalculateSpecular(light, hit_info);
     }
     Ray reflected = Reflect(-hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
-    current = current + hit_info.material.specular * EvaluateRay(reflected);
+    current = current + hit_info.material->specular * EvaluateRay(reflected);
     current = current + CalculateAmbient(hit_info);
 
     return current;
@@ -727,7 +639,7 @@ Color EvaluateRay(Ray ray) {
     if (ray.bounces_left <= 0) return camera->background_color;
 
     HitInformation hit_info;
-    if (FindIntersection(geometry, ray, &hit_info)) {
+    if (FindIntersection(shapes, ray, &hit_info)) {
         return ApplyLighting(ray, hit_info);
     }
     else {
@@ -736,50 +648,42 @@ Color EvaluateRay(Ray ray) {
 }
 
 Color CalculateDiffuse(Light* light, HitInformation hit) {
+    Color il = light->Intensity(hit.pos);
     Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
     float amount = max(0, dot(hit.normal, to_light));
-    Color il = light->Intensity(hit.pos);
-    return hit.material.diffuse * il * amount;
+    return hit.material->diffuse * il * amount;
 }
 
 Color CalculateSpecular(Light* light, HitInformation hit) {
     Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
     Dir3D to_viewer = -hit.viewing;
     Ray test = Reflect(to_light, hit.pos, hit.normal, -1);
-    float amount = pow(max(0, dot(test.dir, to_viewer)), hit.material.phong);
+    float amount = pow(max(0, dot(test.dir, to_viewer)), hit.material->phong);
 
     Color il = light->Intensity(hit.pos);
 
-    return hit.material.specular * il * amount;
+    return hit.material->specular * il * amount;
 }
 
 Color CalculateAmbient(HitInformation hit) {
     Color c = Color(0, 0, 0);
 
-    for (AmbientLight* al : ambient) {
-        c = c + hit.material.ambient * al->color;
+    for (AmbientLight* al : ambient_lights) {
+        c = c + hit.material->ambient * al->color;
     }
+
     return c;
 }
 
 
 void Render() {
-    camera = new Camera(ui_camera);
-
     float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
 
-    for (UIGeometry* geo : ui_shapes) {
-        geometry.push_back(geo->ToGeometry());
-    }
-
-    for (UILight* light : ui_lights) {
-        Light* l = light->ToLight();
-        AmbientLight* al = dynamic_cast<AmbientLight*>(l);
-        if (al == NULL) {
-            lights.push_back(l);
-        }
-        else {
-            ambient.push_back(al);
+    for (Light* light : lights) {
+        light->UpdateMult();
+        AmbientLight* al = dynamic_cast<AmbientLight*>(light);
+        if (al != NULL) {
+            ambient_lights.push_back(al);
         }
     }
 
@@ -803,13 +707,13 @@ void Render() {
                 col = col + (new_color * 0.25);
             }
 #elif SAMPLING == 0
-        float u = camera->mid_res[X] - i + 0.5;
-        float v = camera->mid_res[Y] - j + 0.5;
+            float u = camera->mid_res[X] - i + 0.5;
+            float v = camera->mid_res[Y] - j + 0.5;
 
-        Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
+            Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
 
-        Ray ray = Ray(camera->position, rayDir, camera->max_depth);
-        Color col = EvaluateRay(ray);
+            Ray ray = Ray(camera->position, rayDir, camera->max_depth);
+            Color col = EvaluateRay(ray);
 #else
             Color col = Color(0, 0, 0);
             Color last_color;
@@ -831,24 +735,16 @@ void Render() {
         }
     }
 
+    ambient_lights.clear();
+
+    for (Light* light : lights) {
+        light->ClampColor();
+    }
+
+	// TODO: Instead of displaying image, write to a buffer.
     string relative_output_name = "output/" + string(output_name);
     outputImg.write(relative_output_name.c_str());
     DisplayImage(relative_output_name);
-
-    delete camera;
-    for (Geometry* geo : geometry) {
-        delete geo;
-    }
-    for (Light* light : lights) {
-        delete light;
-    }
-    for (AmbientLight* light : ambient) {
-        delete light;
-    }
-    geometry.clear();
-    lights.clear();
-    ambient.clear();
-
 }
 
 
@@ -996,18 +892,18 @@ int main(int argc, char** argv) {
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
-        ui_camera->ImGui();
+        camera->ImGui();
         ImGui::PopStyleColor(2);
         
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 0.7, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Geometry")) {
-            for (UIGeometry* shape : ui_shapes) {
+            for (Geometry* shape : shapes) {
                 shape->ImGui();
             }
             if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth(), 0))) {
-                UIMaterial* mat = new UIMaterial();
-                ui_materials.push_back(mat);
-                ui_shapes.push_back(new UISphere());
+                Material* mat = new Material();
+                materials.push_back(mat);
+                shapes.push_back(new Sphere());
             }
         }
         ImGui::PopStyleColor();
@@ -1015,23 +911,23 @@ int main(int argc, char** argv) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Lighting")) {
             float spacing = 4.0f;
-            for (UILight* light : ui_lights) {
+            for (Light* light : lights) {
                 light->ImGui();
             }
             if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                ui_lights.push_back(new UIAmbientLight());
+                lights.push_back(new AmbientLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                ui_lights.push_back(new UIPointLight());
+                lights.push_back(new PointLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                ui_lights.push_back(new UISpotLight());
+                lights.push_back(new SpotLight());
             }
             ImGui::SameLine(0.0f, spacing);
             if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - spacing*2, 0))) {
-                ui_lights.push_back(new UIDirectionalLight());
+                lights.push_back(new DirectionalLight());
             }
         }
         ImGui::PopStyleColor();
@@ -1056,15 +952,15 @@ int main(int argc, char** argv) {
         SDL_GL_SwapWindow(window);
     }
 
-    for (UIGeometry* geo : ui_shapes) {
+    for (Geometry* geo : shapes) {
         delete geo;
     }
 
-    for (UILight* light : ui_lights) {
+    for (Light* light : lights) {
         delete light;
     }
 
-    for (UIMaterial* mat : ui_materials) {
+    for (Material* mat : materials) {
         delete mat;
     }
 
