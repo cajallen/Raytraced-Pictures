@@ -20,7 +20,7 @@ Directional light sources
 Spot light sources  
 ![spot lights](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spot_light.png)  
 Basic & Jittered sampling  
-![sampling](https://github.com/cajallen/Raytraced-Pictures/blob/main/SamplingDemo.png)  
+![sampling](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/SamplingDemo.png)  
 Phong Lighting Model  
 ![phong](https://github.com/cajallen/Raytraced-Pictures/blob/main/output/spheres1.png)  
 Reflection  
