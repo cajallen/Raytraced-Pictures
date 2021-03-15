@@ -1,3 +1,6 @@
+## Collaboration
+I set up this project with Jeff Swenson (See commit history). We did our implementations seperately.
+
 ## Compiling
 I use Windows and VS. Good luck.
 
