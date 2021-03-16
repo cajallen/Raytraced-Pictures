@@ -13,6 +13,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <future>
+#include <io.h>
 
 using std::array;
 using std::cout;
@@ -28,30 +30,43 @@ using std::vector;
 
 namespace P3 {
 
+struct Camera;
 struct Geometry;
 struct Sphere;
 struct Material;
 struct Light;
+struct AmbientLight;
 
-// This function is used as a helper to parse the keyed lines
-// Pseudo: if prefix_matches ? string_without_prefix : "";
-inline string rest_if_prefix(const string prefix, string content);
+// UI STATE
+extern vector<Geometry*> shapes;
+extern vector<Light*> lights;
+extern vector<AmbientLight*> ambient_lights;
+extern vector<Material*> materials;
+extern Camera* camera;
+extern int entity_count;
+extern char scene_name[256];
+extern char output_name[256];
+
+extern ImVec2 disp_img_size;
+extern GLuint disp_img_tex;
+
 
 // spaced string stream
 struct ossstream {
-	ossstream(ostringstream& sstream) : sstream(sstream) {}
-	ostringstream& sstream;
+    ossstream(ostringstream& sstream) : sstream(sstream) {}
+    ostringstream& sstream;
 };
 // Hahahahahahahhaha
-inline ossstream& operator << (ossstream& inp_stream, string start) { 
-	inp_stream.sstream << endl << start; 
-	return inp_stream;
+inline ossstream& operator << (ossstream& inp_stream, string start) {
+    inp_stream.sstream << endl << start;
+    return inp_stream;
 }
 template<class T>
 ossstream& operator << (ossstream& inp_stream, const T& x) {
-	inp_stream.sstream << " " << x ;
-	return inp_stream;
+    inp_stream.sstream << " " << x;
+    return inp_stream;
 }
+
 
 
 struct Ray {
@@ -222,11 +237,12 @@ struct SpotLight : Light {
     Color Intensity(Point3D to);
 };
 
-Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left);
+bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 Color EvaluateRay(Ray ray);
 Color CalculateDiffuse(Light* light, HitInformation hit);
 Color CalculateSpecular(Light* light, HitInformation hit);
 Color CalculateAmbient(HitInformation hit);
+Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left);
 
 void Reset();
 void Load();
@@ -236,7 +252,6 @@ void Render();
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
 void DisplayImage(string name);
 
-bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 
 }  // namespace P3
 

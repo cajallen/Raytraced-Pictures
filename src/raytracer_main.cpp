@@ -27,9 +27,6 @@ char output_name[256] = "raytraced.bmp";
 ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
 
-inline string rest_if_prefix(const string prefix, string content) {
-    return content.compare(0, prefix.length(), prefix) == 0 ? content.substr(prefix.length()) : "";
-}
 
 Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left) {
     Line3D normal_dir = vee(Point3D(0, 0, 0), norm).normalized();
@@ -84,170 +81,6 @@ void Geometry::Delete() {
 }
 void Light::Delete() {
     lights.erase(GetIter());
-}
-
-void Camera::Decode(string& s) {
-    string rest;
-    rest = rest_if_prefix("camera_pos: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> position.x >> position.y >> position.z;
-    }
-
-    rest = rest_if_prefix("camera_fwd: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> forward.x >> forward.y >> forward.z;
-    }
-
-    rest = rest_if_prefix("camera_up: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> up.x >> up.y >> up.z;
-    }
-
-    rest = rest_if_prefix("camera_fov_ha: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> half_vfov;
-    }
-
-    rest = rest_if_prefix("film_resolution: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> res[0] >> res[1];
-    }
-
-    rest = rest_if_prefix("output_image: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> output_name;
-    }
-
-    rest = rest_if_prefix("background: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> background_color.r >> background_color.g >> background_color.b;
-    }
-
-    rest = rest_if_prefix("max_depth: ", s);
-    if (rest != "") {
-        stringstream ss(rest);
-        ss >> max_depth;
-    }
-}
-
-void Material::Decode(string& s) {
-    stringstream ss(s);
-    ss >> ambient.r >> ambient.g >> ambient.b >> diffuse.r >> diffuse.g >> diffuse.b >> specular.r >> specular.g >>
-        specular.b >> phong >> transmissive.r >> transmissive.g >> transmissive.b >> ior;
-}
-
-void Geometry::Decode(string& s) {}
-
-void Sphere::Decode(string& s) {
-    stringstream ss(s);
-    ss >> position.x >> position.y >> position.z >> radius;
-}
-
-void Light::Decode(string& s) {
-    stringstream ss(s);
-    ss >> color.r >> color.g >> color.b;
-    ClampColor();
-
-    getline(ss, s);
-}
-
-void AmbientLight::Decode(string& s) {
-    Light::Decode(s);
-}
-
-void PointLight::Decode(string& s) {
-    Light::Decode(s);
-    stringstream ss(s);
-    ss >> position.x >> position.y >> position.z;
-}
-
-void DirectionalLight::Decode(string& s) {
-    Light::Decode(s);
-    stringstream ss(s);
-    ss >> direction.x >> direction.y >> direction.z;
-}
-
-void SpotLight::Decode(string& s) {
-    Light::Decode(s);
-    stringstream ss(s);
-    ss >> position.x >> position.y >> position.z >> direction.x >> direction.y >> direction.z >> angle1 >> angle2;
-}
-
-string Camera::Encode() {
-    ostringstream oss;
-    ossstream osss(oss);
-
-    osss << "camera_pos:" << position.x << position.y << position.z;
-    osss << "camera_fwd:" << forward.x << forward.y << forward.z;
-    osss << "camera_up:" << up.x << up.y << up.z;
-    osss << "camera_fov_ha:" << half_vfov;
-    osss << "film_resolution:" << res[0] << res[1];
-    osss << "output_image:" << output_name;
-    osss << "background:" << background_color.r << background_color.g << background_color.b;
-    osss << "max_depth:" << max_depth << "";
-
-    return oss.str();
-}
-
-string Material::Encode() {
-    ostringstream oss("material:");
-    ossstream osss(oss);
-    osss << ambient.r << ambient.g << ambient.b << diffuse.r << diffuse.g << diffuse.b << specular.r << specular.g
-         << specular.b << phong << transmissive.r << transmissive.g << transmissive.b << ior;
-    return oss.str();
-}
-
-string Geometry::Encode() {
-    string temp = material->Encode();
-    temp += "\n";
-    return temp;
-}
-
-string Sphere::Encode() {
-    ostringstream oss(Geometry::Encode() + "sphere:");
-    ossstream osss(oss);
-    osss << position.x << position.y << position.z << radius;
-    return oss.str();
-}
-
-string Light::Encode() {
-    ostringstream oss;
-    ossstream osss(oss);
-    osss << color.r * mult << color.g * mult << color.b * mult;
-    return oss.str();
-}
-
-string AmbientLight::Encode() {
-    string temp = "ambient_light:" + Light::Encode();
-    return temp;
-}
-
-string DirectionalLight::Encode() {
-    ostringstream oss("directional_light:" + Light::Encode());
-    ossstream osss(oss);
-    osss << direction.x << direction.y << direction.z;
-    return oss.str();
-}
-
-string PointLight::Encode() {
-    ostringstream oss("point_light:" + Light::Encode());
-    ossstream osss(oss);
-    osss << position.x << position.y << position.z;
-    return oss.str();
-}
-
-string SpotLight::Encode() {
-    ostringstream oss("spot_light:" + Light::Encode());
-    ossstream osss(oss);
-    osss << position.x << position.y << position.z << direction.x << direction.y << direction.z << angle1 << angle2;
-    return oss.str();
 }
 
 void Light::UpdateMult() {
@@ -335,7 +168,7 @@ Color PointLight::Intensity(Point3D to) {
 
 Color SpotLight::Intensity(Point3D to) {
     Dir3D angle_to = (to - position).normalized();
-    float diff = 180 * acos(dot(angle_to, direction)) / M_PI;
+    float diff = 180.0 * acos(dot(angle_to, direction)) / M_PI;
     float dist2 = pow(DistanceTo(to), 2);
 
     if (diff < angle1)
@@ -370,91 +203,6 @@ void Reset() {
     camera = new Camera();
 }
 
-void Load() {
-    Reset();
-
-    string scene_string = "scenes/" + string(scene_name) + ".p3";
-
-    ifstream scene_file(scene_string);
-    if (!scene_file.is_open())
-        return;
-
-    string line;
-    while (getline(scene_file, line)) {
-        string rest;
-
-        // Only camera can Decode this way because only camera is pseudostatic
-        camera->Decode(line);
-
-        rest = rest_if_prefix("sphere: ", line);
-        if (rest != "") {
-            Sphere* new_sphere = new Sphere();
-            new_sphere->Decode(rest);
-            shapes.push_back(new_sphere);
-        }
-
-        rest = rest_if_prefix("material: ", line);
-        if (rest != "") {
-            Material* new_mat = new Material();
-            new_mat->Decode(rest);
-            materials.push_back(new_mat);
-        }
-
-        rest = rest_if_prefix("ambient_light: ", line);
-        if (rest != "") {
-            AmbientLight* new_light = new AmbientLight();
-            new_light->Decode(rest);
-            lights.push_back(new_light);
-        }
-
-        rest = rest_if_prefix("directional_light: ", line);
-        if (rest != "") {
-            DirectionalLight* new_light = new DirectionalLight();
-            new_light->Decode(rest);
-            lights.push_back(new_light);
-        }
-
-        rest = rest_if_prefix("point_light: ", line);
-        if (rest != "") {
-            PointLight* new_light = new PointLight();
-            new_light->Decode(rest);
-            lights.push_back(new_light);
-        }
-
-        rest = rest_if_prefix("spot_light: ", line);
-        if (rest != "") {
-            SpotLight* new_light = new SpotLight();
-            new_light->Decode(rest);
-            lights.push_back(new_light);
-        }
-    }
-    scene_file.close();
-}
-
-void Save() {
-    if (string(scene_name) == "") {
-        return;
-    }
-
-    string scene_string = "scenes/" + string(scene_name) + ".p3";
-
-    ofstream scene_file(scene_string);
-    if (!scene_file.is_open()) {
-        return;
-    }
-
-    scene_file << camera->Encode() << endl;
-
-    for (Geometry* geo : shapes) {
-        scene_file << geo->Encode() << endl;
-    }
-
-    for (Light* light : lights) {
-        scene_file << light->Encode() << endl;
-    }
-
-    scene_file.close();
-}
 
 Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
@@ -533,32 +281,34 @@ void Render() {
     }
 
     Image outputImg = Image(camera->res[X], camera->res[Y]);
-    for (int i = 0; i < camera->res[X]; i++) {
-        for (int j = 0; j < camera->res[Y]; j++) {
-            vector<ImVec2> offsets;
+
+#pragma omp parallel for num_threads(16) schedule(dynamic, camera->res[X])
+    for (int i = 0; i < camera->res[X] * camera->res[Y]; i++) {
+        int x = i % camera->res[X];
+        int y = i / camera->res[X];
+        vector<ImVec2> offsets;
 #if SAMPLING == -1
-            offsets = {ImVec2(0.50, 0.50), ImVec2(0.15, 0.15), ImVec2(0.85, 0.15), ImVec2(0.85, 0.85),
-                       ImVec2(0.15, 0.85)};
+        offsets = {ImVec2(0.50, 0.50), ImVec2(0.15, 0.15), ImVec2(0.85, 0.15), ImVec2(0.85, 0.85),
+                    ImVec2(0.15, 0.85)};
 #elif SAMPLING == 0
-            offsets = {ImVec2(0.5, 0.5)};
+        offsets = {ImVec2(0.5, 0.5)};
 #else
-            for (int samp_i = 0; samp_i < SAMPLING; samp_i++)
-                offsets.push_back(ImVec2(randf(), randf()));
+        for (int samp_i = 0; samp_i < SAMPLING; samp_i++)
+            offsets.push_back(ImVec2(randf(), randf()));
 #endif
-            Color col = Color(0, 0, 0);
-            for (ImVec2 offset : offsets) {
-                float u = camera->mid_res[X] - i + offset.x;
-                float v = camera->mid_res[Y] - j + offset.y;
+        Color col = Color(0, 0, 0);
+        for (ImVec2 offset : offsets) {
+            float u = camera->mid_res[X] - x + offset.x;
+            float v = camera->mid_res[Y] - y + offset.y;
 
-                Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
+            Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
 
-                Ray ray = Ray(camera->position, rayDir, camera->max_depth);
-                Color new_color = EvaluateRay(ray);
-                new_color.Clamp();
-                col = col + new_color * (1.0 / offsets.size());
-            }
-            outputImg.setPixel(i, j, col);
+            Ray ray = Ray(camera->position, rayDir, camera->max_depth);
+            Color new_color = EvaluateRay(ray);
+            new_color.Clamp();
+            col = col + new_color * (1.0 / offsets.size());
         }
+        outputImg.setPixel(x, y, col);
     }
 
     ambient_lights.clear();
@@ -570,7 +320,6 @@ void Render() {
     // TODO: Instead of displaying image, write to a buffer.
     string relative_output_name = "output/" + string(output_name);
     outputImg.write(relative_output_name.c_str());
-    DisplayImage(relative_output_name);
 }
 
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection) {
@@ -650,6 +399,7 @@ int main(int argc, char** argv) {
 
     // Main loop
     bool done = false;
+    future<void> render_call;
     while (!done) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -668,8 +418,9 @@ int main(int argc, char** argv) {
 
         ImGui::Begin("Renderer Settings");
 
+
         if (ImGui::Button("Render", ImVec2(ImGui::GetWindowWidth(), 0))) {
-            Render();
+            render_call = async(Render);
         }
 
         if (ImGui::Button("Save")) {
@@ -683,12 +434,12 @@ int main(int argc, char** argv) {
         ImGui::InputTextWithHint("", "<scene filename>", scene_name, 256, ImGuiInputTextFlags_CharsNoBlank);
         ImGui::InputTextWithHint("Output Name", "output.png", output_name, 256, ImGuiInputTextFlags_CharsNoBlank);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.7, 0.7, 1.0, 1.0});
-        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{0.4, 0.4, 0.5, 1.0});
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
+        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
         camera->ImGui();
         ImGui::PopStyleColor(2);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 0.7, 0.7, 1.0});
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 0.7, 0.7, 1.0 });
         if (ImGui::CollapsingHeader("Geometry")) {
             for (Geometry* shape : shapes) {
                 shape->ImGui();
@@ -701,7 +452,7 @@ int main(int argc, char** argv) {
         }
         ImGui::PopStyleColor();
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 1.0, 0.7, 1.0});
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0 });
         if (ImGui::CollapsingHeader("Lighting")) {
             float spacing = 4.0f;
             for (Light* light : lights) {
@@ -725,6 +476,13 @@ int main(int argc, char** argv) {
         }
         ImGui::PopStyleColor();
 
+        if (render_call.valid()) {
+            render_call.get(); // Calling get makes the render_call invalid, storing that we used it.
+            string relative_output_name = "output/" + string(output_name);
+            if (_access(relative_output_name.c_str(), 0) != -1)
+                DisplayImage(relative_output_name);
+        }
+
         if (disp_img_tex != -1) {
             ImGui::Begin("Output");
             ImGui::Image((void*)(intptr_t)disp_img_tex, disp_img_size);
@@ -735,6 +493,7 @@ int main(int argc, char** argv) {
 
         // Rendering
         ImGui::Render();
+
 
         glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);

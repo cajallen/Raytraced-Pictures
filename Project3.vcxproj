@@ -76,6 +76,11 @@
     <LibraryPath>src\lib\SDL2-2.0.14\lib\x64;$(LibraryPath)</LibraryPath>
     <SourcePath>C:\Users\cajal\Documents\School\2021SPRING\Graphics\Project3\src;$(SourcePath)</SourcePath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>src\lib\SDL2-2.0.14\include;src\lib;src;src\lib\imgui-1.81;src\lib\geom_lib;$(IncludePath)</IncludePath>
+    <LibraryPath>src\lib\SDL2-2.0.14\lib\x64;$(LibraryPath)</LibraryPath>
+    <SourcePath>C:\Users\cajal\Documents\School\2021SPRING\Graphics\Project3\src;$(SourcePath)</SourcePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -114,7 +119,24 @@
     </Link>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <OpenMPSupport>true</OpenMPSupport>
+      <Optimization>Disabled</Optimization>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
     </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\lib\glad\glad.c" />
@@ -127,6 +149,7 @@
     <ClCompile Include="src\lib\imgui-1.81\imgui_tables.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\imgui_widgets.cpp" />
     <ClCompile Include="src\lib\imgui-1.81\misc\cpp\imgui_stdlib.cpp" />
+    <ClCompile Include="src\raytracer_io.cpp" />
     <ClCompile Include="src\raytracer_main.cpp" />
     <ClCompile Include="src\raytracer_ui.cpp" />
   </ItemGroup>
