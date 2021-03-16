@@ -28,6 +28,7 @@ struct Color {
     Color operator*(const Color& rhs) const;
     Color operator*(const float& rhs) const;
     bool operator==(const Color& rhs) const;
+	bool operator<(const Color& rhs) const;
 };
 
 struct Image {

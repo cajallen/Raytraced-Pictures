@@ -28,15 +28,11 @@ ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
 
 
-Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left) {
-    Line3D normal_dir = vee(Point3D(0, 0, 0), norm).normalized();
-    Point3D midpoint = proj(Point3D(ang.x, ang.y, ang.z), normal_dir);
-    Point3D diff = midpoint - ang;
-    Point3D to_out = (midpoint + diff).normalized();
-
-    Point3D from = pos + norm * 0.001;
-
-    return Ray(from, Dir3D(to_out.x, to_out.y, to_out.z), bounces_left);
+Ray Reflect(vec3 dir_in, vec3 origin, vec3 dir_mirror, int bounces_left) {
+	vec3 ray_origin = origin + dir_mirror * 0.001;
+	vec3 midpoint = dir_mirror * dot(dir_in, dir_mirror);
+	vec3 out_dir = (2*midpoint - dir_in).normalized();
+	return Ray(ray_origin, out_dir, bounces_left);
 }
 
 // Call without index to create new shapes
@@ -55,6 +51,27 @@ Geometry::Geometry() : Object() {
 }
 Geometry::Geometry(int old_id) : Object(old_id) {
     material = materials.back();
+}
+
+BoundingBox Sphere::GetBoundingBox() {
+	BoundingBox bb;
+	bb.min = position - vec3(radius, radius, radius);
+	bb.max = position + vec3(radius, radius, radius);
+	return bb;
+}
+
+bool BoundingBox::Intersects(BoundingBox other) {
+	bool x_overlaps = (max.x > other.min.x && min.x < other.max.x);
+	bool y_overlaps = (max.y > other.min.y && min.y < other.max.y);
+	bool z_overlaps = (max.z > other.min.z && min.z < other.max.z);
+	return x_overlaps && y_overlaps && z_overlaps;
+}
+
+BoundingBox BoundingBox::Union(BoundingBox other) {
+	BoundingBox bb;
+	bb.min = vec3(fmin(min.x, other.min.x), fmin(min.y, other.min.y), fmin(min.z, other.min.z));
+	bb.max = vec3(fmax(max.x, other.max.x), fmin(max.y, other.max.y), fmin(max.z, other.max.z));
+	return bb;
 }
 
 vector<Geometry*>::iterator Geometry::GetIter() {
@@ -99,7 +116,7 @@ void Light::ClampColor() {
 }
 
 bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
-    Dir3D toStart = (ray.pos - position);
+    vec3 toStart = (ray.pos - position);
     float b = 2 * dot(ray.dir, toStart);
     float c = dot(toStart, toStart) - pow(radius, 2);
     float discr = pow(b, 2) - 4 * c;
@@ -116,49 +133,49 @@ bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
     if (mint < 0.0)
         return false;
 
-    Point3D hit_pos = ray.pos + mint * ray.dir;
-    Dir3D hit_norm = (hit_pos - position).normalized();
+    vec3 hit_pos = ray.pos + mint * ray.dir;
+    vec3 hit_norm = (hit_pos - position).normalized();
     *intersection = HitInformation{mint, hit_pos, ray.dir, hit_norm, material};
 
     return true;
 }
 
-Ray DirectionalLight::ReverseLightRay(Point3D from) {
+Ray DirectionalLight::ReverseLightRay(vec3 from) {
     return Ray{from, -direction, -1};
 }
 
-Ray PointLight::ReverseLightRay(Point3D from) {
-    Dir3D offset = position - from;
+Ray PointLight::ReverseLightRay(vec3 from) {
+    vec3 offset = position - from;
 
     return Ray{from, offset.normalized(), -1};
 }
 
-Ray SpotLight::ReverseLightRay(Point3D from) {
-    Dir3D offset = position - from;
+Ray SpotLight::ReverseLightRay(vec3 from) {
+    vec3 offset = position - from;
 
     return Ray{from, offset.normalized(), -1};
 }
 
-float DirectionalLight::DistanceTo(Point3D to) {
+float DirectionalLight::DistanceTo2(vec3 to) {
     return INFINITY;
 }
 
-float PointLight::DistanceTo(Point3D to) {
-    Dir3D offset = to - position;
-    return offset.magnitude();
+float PointLight::DistanceTo2(vec3 to) {
+    vec3 offset = to - position;
+    return offset.mag2();
 }
 
-float SpotLight::DistanceTo(Point3D to) {
-    Dir3D offset = to - position;
-    return offset.magnitude();
+float SpotLight::DistanceTo2(vec3 to) {
+    vec3 offset = to - position;
+    return offset.mag2();
 }
 
-Color DirectionalLight::Intensity(Point3D to) {
+Color DirectionalLight::Intensity(vec3 to) {
     return color;
 }
 
-Color PointLight::Intensity(Point3D to) {
-    float dist2 = pow(DistanceTo(to), 2);
+Color PointLight::Intensity(vec3 to) {
+    float dist2 = DistanceTo2(to);
     float r = color.r / dist2;
     float g = color.g / dist2;
     float b = color.b / dist2;
@@ -166,10 +183,10 @@ Color PointLight::Intensity(Point3D to) {
     return Color(r, g, b);
 }
 
-Color SpotLight::Intensity(Point3D to) {
-    Dir3D angle_to = (to - position).normalized();
+Color SpotLight::Intensity(vec3 to) {
+    vec3 angle_to = (to - position).normalized();
     float diff = 180.0 * acos(dot(angle_to, direction)) / M_PI;
-    float dist2 = pow(DistanceTo(to), 2);
+    float dist2 = DistanceTo2(to);
 
     if (diff < angle1)
         return color * (1 / dist2);
@@ -208,7 +225,7 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
 
     for (Light* light : lights) {
-        if (light->Intensity(hit_info.pos) == Color(0, 0, 0))
+        if (light->Intensity(hit_info.pos) < Color(0.001, 0.001, 0.001))
             continue;
 
         Ray to_light = light->ReverseLightRay(hit_info.pos);
@@ -216,7 +233,7 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
         HitInformation light_intersection;
         // If light is blocked
         if (FindIntersection(shapes, to_light, &light_intersection) &&
-            light_intersection.dist < light->DistanceTo(hit_info.pos))
+            light_intersection.dist < sqrt(light->DistanceTo2(hit_info.pos)))
             continue;
 
         current = current + CalculateDiffuse(light, hit_info);
@@ -243,14 +260,14 @@ Color EvaluateRay(Ray ray) {
 
 Color CalculateDiffuse(Light* light, HitInformation hit) {
     Color il = light->Intensity(hit.pos);
-    Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
+    vec3 to_light = light->ReverseLightRay(hit.pos).dir;
     float amount = max(0, dot(hit.normal, to_light));
     return hit.material->diffuse * il * amount;
 }
 
 Color CalculateSpecular(Light* light, HitInformation hit) {
-    Dir3D to_light = light->ReverseLightRay(hit.pos).dir;
-    Dir3D to_viewer = -hit.viewing;
+    vec3 to_light = light->ReverseLightRay(hit.pos).dir;
+    vec3 to_viewer = -hit.viewing;
     Ray test = Reflect(to_light, hit.pos, hit.normal, -1);
     float amount = pow(max(0, dot(test.dir, to_viewer)), hit.material->phong);
 
@@ -301,7 +318,7 @@ void Render() {
             float u = camera->mid_res[X] - x + offset.x;
             float v = camera->mid_res[Y] - y + offset.y;
 
-            Dir3D rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
+            vec3 rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
 
             Ray ray = Ray(camera->position, rayDir, camera->max_depth);
             Color new_color = EvaluateRay(ray);

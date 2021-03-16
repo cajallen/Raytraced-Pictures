@@ -77,7 +77,7 @@
     <SourcePath>C:\Users\cajal\Documents\School\2021SPRING\Graphics\Project3\src;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>src\lib\SDL2-2.0.14\include;src\lib;src;src\lib\imgui-1.81;src\lib\geom_lib;$(IncludePath)</IncludePath>
+    <IncludePath>src\lib\SDL2-2.0.14\include;src\lib;src;src\lib\imgui-1.81;$(IncludePath)</IncludePath>
     <LibraryPath>src\lib\SDL2-2.0.14\lib\x64;$(LibraryPath)</LibraryPath>
     <SourcePath>C:\Users\cajal\Documents\School\2021SPRING\Graphics\Project3\src;$(SourcePath)</SourcePath>
   </PropertyGroup>

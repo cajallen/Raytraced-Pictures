@@ -1,20 +1,20 @@
-#ifndef _MAIN_H
-#define _MAIN_H
+#ifndef _RAYTRACER_MAIN_H
+#define _RAYTRACER_MAIN_H
 
-#include <PGA_3D.h>
 #include <SDL.h>
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl.h>
 #include <glad/glad.h>
+#include <image_lib.h>
+#include <io.h>
+#include <vec3.h>
 #include <array>
 #include <fstream>
-#include <image_lib.h>
+#include <future>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <future>
-#include <io.h>
 
 using std::array;
 using std::cout;
@@ -50,38 +50,35 @@ extern char output_name[256];
 extern ImVec2 disp_img_size;
 extern GLuint disp_img_tex;
 
-
 // spaced string stream
 struct ossstream {
     ossstream(ostringstream& sstream) : sstream(sstream) {}
     ostringstream& sstream;
 };
 // Hahahahahahahhaha
-inline ossstream& operator << (ossstream& inp_stream, string start) {
+inline ossstream& operator<<(ossstream& inp_stream, string start) {
     inp_stream.sstream << endl << start;
     return inp_stream;
 }
-template<class T>
-ossstream& operator << (ossstream& inp_stream, const T& x) {
+template <class T>
+ossstream& operator<<(ossstream& inp_stream, const T& x) {
     inp_stream.sstream << " " << x;
     return inp_stream;
 }
 
-
-
 struct Ray {
-    Point3D pos;
-    Dir3D dir;
+    vec3 pos;
+    vec3 dir;
     int bounces_left;
 
-    Ray(Point3D p, Dir3D d, int b) : pos(p), dir(d.normalized()), bounces_left(b) {}
+    Ray(vec3 p, vec3 d, int b) : pos(p), dir(d.normalized()), bounces_left(b) {}
 };
 
 struct HitInformation {
     float dist;
-    Point3D pos;
-    Dir3D viewing;
-    Dir3D normal;
+    vec3 pos;
+    vec3 viewing;
+    vec3 normal;
     Material* material;
 };
 
@@ -119,8 +116,8 @@ struct Material : Object {
 };
 
 struct Camera : Object {
-    Point3D position = Point3D(0, 0, 0);
-    Dir3D forward = Dir3D(-1, 0, 0), up = Dir3D(0, 1, 0), right = Dir3D(0, 0, 0);
+    vec3 position = vec3(0, 0, 0);
+    vec3 forward = vec3(-1, 0, 0), up = vec3(0, 1, 0), right = vec3(0, 0, 0);
     Color background_color = Color(0, 0, 0);
     float half_vfov = 45;
     array<int, 2> res{640, 480};
@@ -132,6 +129,14 @@ struct Camera : Object {
     void ImGui();
     string Encode();
     void Decode(string& s);
+};
+
+struct BoundingBox {
+	vec3 min = vec3(0, 0, 0);
+	vec3 max = vec3(0, 0, 0);
+
+	bool Intersects(BoundingBox other);
+	BoundingBox Union(BoundingBox other);
 };
 
 struct Geometry : Object {
@@ -148,10 +153,11 @@ struct Geometry : Object {
     void Decode(string& s);
 
     virtual bool FindIntersection(Ray ray, HitInformation* intersection) { return false; }
+	virtual BoundingBox GetBoundingBox() { return BoundingBox(); }
 };
 
 struct Sphere : Geometry {
-    Point3D position = Point3D(0, 0, 0);
+    vec3 position = vec3(0, 0, 0);
     float radius = 1.0;
 
     using Geometry::Geometry;
@@ -161,6 +167,7 @@ struct Sphere : Geometry {
     void Decode(string& s);
 
     bool FindIntersection(Ray ray, HitInformation* intersection);
+	BoundingBox GetBoundingBox();
 };
 
 // Non-enforced abstract class for lights
@@ -179,9 +186,9 @@ struct Light : Object {
     void Delete();
 
     // Non-enforced abstract
-    virtual Ray ReverseLightRay(Point3D from) { return Ray(Point3D(), Dir3D(), -1); }
-    virtual float DistanceTo(Point3D to) { return -1.0f; }
-    virtual Color Intensity(Point3D to) { return Color(0, 0, 0); }
+    virtual Ray ReverseLightRay(vec3 from) { return Ray(vec3(), vec3(), -1); }
+    virtual float DistanceTo2(vec3 to) { return -1.0; }
+    virtual Color Intensity(vec3 to) { return Color(0, 0, 0); }
 };
 
 struct AmbientLight : Light {
@@ -193,7 +200,7 @@ struct AmbientLight : Light {
 };
 
 struct DirectionalLight : Light {
-    Dir3D direction = Dir3D(0, -1, 0);
+    vec3 direction = vec3(0, -1, 0);
 
     using Light::Light;
 
@@ -201,13 +208,13 @@ struct DirectionalLight : Light {
     string Encode();
     void Decode(string& s);
 
-    Ray ReverseLightRay(Point3D from);
-    float DistanceTo(Point3D to);
-    Color Intensity(Point3D to);
+    Ray ReverseLightRay(vec3 from);
+    float DistanceTo2(vec3 to);
+    Color Intensity(vec3 to);
 };
 
 struct PointLight : Light {
-    Point3D position = Point3D(0, 0, 0);
+    vec3 position = vec3(0, 0, 0);
 
     using Light::Light;
 
@@ -215,14 +222,14 @@ struct PointLight : Light {
     string Encode();
     void Decode(string& s);
 
-    Ray ReverseLightRay(Point3D from);
-    float DistanceTo(Point3D to);
-    Color Intensity(Point3D to);
+    Ray ReverseLightRay(vec3 from);
+    float DistanceTo2(vec3 to);
+    Color Intensity(vec3 to);
 };
 
 struct SpotLight : Light {
-    Point3D position = Point3D(0, 0, 0);
-    Dir3D direction = Dir3D(0, -1, 0);
+    vec3 position = vec3(0, 0, 0);
+    vec3 direction = vec3(0, -1, 0);
     float angle1 = 30.0;
     float angle2 = 45.0;
 
@@ -232,9 +239,9 @@ struct SpotLight : Light {
     string Encode();
     void Decode(string& s);
 
-    Ray ReverseLightRay(Point3D from);
-    float DistanceTo(Point3D to);
-    Color Intensity(Point3D to);
+    Ray ReverseLightRay(vec3 from);
+    float DistanceTo2(vec3 to);
+    Color Intensity(vec3 to);
 };
 
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
@@ -242,7 +249,7 @@ Color EvaluateRay(Ray ray);
 Color CalculateDiffuse(Light* light, HitInformation hit);
 Color CalculateSpecular(Light* light, HitInformation hit);
 Color CalculateAmbient(HitInformation hit);
-Ray Reflect(Dir3D ang, Point3D pos, Dir3D norm, int bounces_left);
+Ray Reflect(vec3 ang, vec3 pos, vec3 norm, int bounces_left);
 
 void Reset();
 void Load();
@@ -251,7 +258,6 @@ void Render();
 
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
 void DisplayImage(string name);
-
 
 }  // namespace P3
 

@@ -14,9 +14,9 @@ void Camera::ImGui() {
         ImGui::DragFloat3("Camera Position", &position.x, 0.1);
         ImGui::SliderFloat3("Camera Forward", &forward.x, -1.0f, 1.0f);
         ImGui::SliderFloat3("Camera Up", &up.x, -1.0f, 1.0f);
-        ImGui::SliderFloat("FOV", &half_vfov, 0.0f, 90.0f);
+        ImGui::SliderFloat("FOV", &half_vfov, 0.0f, 180.0f);
         ImGui::DragInt2("Resolution", &res[0], 1);
-        ImGui::SliderInt("Max Depth", &max_depth, 1, 20);
+        ImGui::SliderInt("Max Depth", &max_depth, 1, 8);
         ImGui::ColorEdit3("Background Color", &background_color.r);
     }
     mid_res = { res[X] / 2, res[Y] / 2 };

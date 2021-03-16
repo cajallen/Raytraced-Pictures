@@ -16,6 +16,10 @@ bool Color::operator==(const Color& rhs) const {
     return r == rhs.r && g == rhs.g && b == rhs.b;
 }
 
+bool Color::operator<(const Color& rhs) const {
+    return r < rhs.r && g < rhs.g && b < rhs.b;
+}
+
 Color Color::Lerp(const Color& rhs, float amt) const {
     float nr = LERP(r, rhs.r, amt);
     float ng = LERP(g, rhs.g, amt);
