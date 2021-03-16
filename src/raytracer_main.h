@@ -132,11 +132,8 @@ struct Camera : Object {
 };
 
 struct BoundingBox {
-	vec3 min = vec3(0, 0, 0);
-	vec3 max = vec3(0, 0, 0);
-
-	bool Intersects(BoundingBox other);
-	BoundingBox Union(BoundingBox other);
+	vec3 min = vec3(0,0,0);
+	vec3 max = vec3(0,0,0);
 };
 
 struct Geometry : Object {
@@ -153,6 +150,7 @@ struct Geometry : Object {
     void Decode(string& s);
 
     virtual bool FindIntersection(Ray ray, HitInformation* intersection) { return false; }
+	virtual bool OverlapsCube(vec3 pos, float hwidth) { return false; }
 	virtual BoundingBox GetBoundingBox() { return BoundingBox(); }
 };
 
@@ -167,6 +165,7 @@ struct Sphere : Geometry {
     void Decode(string& s);
 
     bool FindIntersection(Ray ray, HitInformation* intersection);
+	bool OverlapsCube(vec3 pos, float hwidth);
 	BoundingBox GetBoundingBox();
 };
 

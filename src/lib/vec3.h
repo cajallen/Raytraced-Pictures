@@ -8,6 +8,29 @@ inline float fclamp(float a, float min, float max) {
     return fmax(min, fmin(a, max));
 }
 
+struct vec3i {
+    int x, y, z;
+
+    vec3i(int x, int y, int z) : x(x), y(y), z(z) {}
+    vec3i() : x(0), y(0), z(0) {}
+};
+
+vec3i imin(vec3i a, vec3i b) {
+	return vec3i(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z));
+}
+
+vec3i imax(vec3i a, vec3i b) {
+	return vec3i(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z));
+}
+
+template<>
+struct hash<vec3i>{
+	#define BASE 16
+	size_t operator()(const vec3i& v) const {
+		return v.x * (BASE*BASE) + v.y * BASE + v.z;
+	}
+};
+
 struct vec3 {
     float x, y, z;
 
@@ -41,6 +64,14 @@ struct vec3 {
 
 	vec3 operator-() const {
 		return vec3(-x, -y, -z);
+	}
+
+	float& operator[](int index) {
+		if (index == 0) return x;
+		if (index == 1) return y;
+		if (index == 2) return z;
+		throw runtime_error("vec3[] out of bounds");
+		return x;
 	}
 };
 

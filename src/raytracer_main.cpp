@@ -53,27 +53,6 @@ Geometry::Geometry(int old_id) : Object(old_id) {
     material = materials.back();
 }
 
-BoundingBox Sphere::GetBoundingBox() {
-	BoundingBox bb;
-	bb.min = position - vec3(radius, radius, radius);
-	bb.max = position + vec3(radius, radius, radius);
-	return bb;
-}
-
-bool BoundingBox::Intersects(BoundingBox other) {
-	bool x_overlaps = (max.x > other.min.x && min.x < other.max.x);
-	bool y_overlaps = (max.y > other.min.y && min.y < other.max.y);
-	bool z_overlaps = (max.z > other.min.z && min.z < other.max.z);
-	return x_overlaps && y_overlaps && z_overlaps;
-}
-
-BoundingBox BoundingBox::Union(BoundingBox other) {
-	BoundingBox bb;
-	bb.min = vec3(fmin(min.x, other.min.x), fmin(min.y, other.min.y), fmin(min.z, other.min.z));
-	bb.max = vec3(fmax(max.x, other.max.x), fmin(max.y, other.max.y), fmin(max.z, other.max.z));
-	return bb;
-}
-
 vector<Geometry*>::iterator Geometry::GetIter() {
     for (vector<Geometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
         if ((*it)->id == id) {
@@ -139,6 +118,31 @@ bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
 
     return true;
 }
+
+BoundingBox Sphere::GetBoundingBox() {
+	BoundingBox bb;
+	bb.min = position - vec3(radius, radius, radius);
+	bb.max = position + vec3(radius, radius, radius);
+	return bb;
+}
+
+bool Sphere::OverlapsCube(vec3 pos, float hwidth) {
+	float d = 0;
+	for (int i = 0; i < 3; i++) {
+		float min = pos[i] - hwidth;
+		float max = pos[i] + hwidth;
+		if (position[i] < min) {
+			float axis_d = position[i] - min;
+			d += axis_d * axis_d;
+		}
+		else if (position[i] > max) {
+			float axis_d = position[i] - max;
+			d += axis_d * axis_d;
+		}
+	}
+	return d < radius * radius;
+}
+
 
 Ray DirectionalLight::ReverseLightRay(vec3 from) {
     return Ray{from, -direction, -1};
