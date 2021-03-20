@@ -2,8 +2,8 @@
 #define _RAYTRACER_MAIN_H
 
 #include <SDL.h>
-#include <backends/imgui_impl_opengl3.h>
-#include <backends/imgui_impl_sdl.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_sdl.h>
 #include <glad/glad.h>
 #include <image_lib.h>
 #include <io.h>

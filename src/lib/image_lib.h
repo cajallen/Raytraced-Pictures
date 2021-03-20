@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "stb_image.h"
+#include <stb_image.h>
 #include "stb_image_write.h"
 
 #define LERP(a, b, r) ((1.0 - r) * a + r * b)
