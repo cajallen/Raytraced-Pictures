@@ -4,5 +4,5 @@
 /Debug
 /enc_temp_folder
 /src/.vscode
-.user
-.ini
+*.user
+*.ini
