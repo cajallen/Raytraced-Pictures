@@ -65,7 +65,6 @@ Image::Image(const char* fname) {
 
     for (int i = 0; i < width; i++) {
         for (int j = 0; j < height; j++) {
-            Color col = getPixel(i, j);
             pixels[(i + j * width)] =
                 Color(data[4 * (i + j * width) + 0] / 255.0,
                       data[4 * (i + j * width) + 1] / 255.0,
@@ -76,12 +75,12 @@ Image::Image(const char* fname) {
     stbi_image_free(data);
 }
 
-void Image::setPixel(int i, int j, Color c) {
-    pixels[i + j * width] = c;
+void Image::setPixel(int x, int y, Color c) {
+    pixels[x + y * width] = c;
 }
 
-Color& Image::getPixel(int i, int j) {
-    return pixels[i + j * width];
+Color& Image::getPixel(int x, int y) {
+    return pixels[x + y * width];
 }
 
 uint8_t* Image::toBytes() {

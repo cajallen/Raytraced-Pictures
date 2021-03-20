@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 using std::array;
 using std::cout;
@@ -24,9 +25,21 @@ using std::ofstream;
 using std::string;
 using std::stringstream;
 using std::vector;
+using namespace std::chrono;
 
 #define X 0
 #define Y 1
+
+#define RENDER_DELAY 0.1
+
+// any SAMPLING > 0 is randomly sampled.
+#define AA_RANDOM 4
+#define AA_NONE 0
+#define AA_FIVE -1
+
+#define SAMPLING AA_NONE
+
+#define H_SPACING 4
 
 namespace P3 {
 
@@ -46,20 +59,32 @@ extern Camera* camera;
 extern int entity_count;
 extern char scene_name[256];
 extern char output_name[256];
+extern steady_clock::time_point last_request;
+extern int vertex_i;
+extern vector<vec3> vertices;
+extern int normal_i;
+extern vector<vec3> normals;
 
 extern ImVec2 disp_img_size;
 extern GLuint disp_img_tex;
 
-// spaced string stream
+
+// Out Spaced String Stream
+// If you want to understand any of the Encode functions, this is a prerequisite.
 struct ossstream {
     ossstream(ostringstream& sstream) : sstream(sstream) {}
     ostringstream& sstream;
 };
-// Hahahahahahahhaha
+// Prepend a newline if we're <<'ing a string literal (ALWAYS a key for scene files)
 inline ossstream& operator<<(ossstream& inp_stream, string start) {
     inp_stream.sstream << endl << start;
     return inp_stream;
 }
+inline ossstream& operator<<(ossstream& inp_stream, const char* start) {
+    inp_stream.sstream << endl << start;
+    return inp_stream;
+}
+// Prepend a space if we're <<'ing anything else (ALWAYS a value for scene files)
 template <class T>
 ossstream& operator<<(ossstream& inp_stream, const T& x) {
     inp_stream.sstream << " " << x;
@@ -70,15 +95,25 @@ struct Ray {
     vec3 pos;
     vec3 dir;
     int bounces_left;
+	Material* last_material = NULL;
 
     Ray(vec3 p, vec3 d, int b) : pos(p), dir(d.normalized()), bounces_left(b) {}
+    static Ray Reflect(vec3 ang, vec3 pos, vec3 norm, int bounces_left);
+	static Ray Refract(vec3 dir_in, vec3 origin, vec3 norm, float iorold, float iornew, int bounces_left);
 };
 
 struct HitInformation {
     float dist;
     vec3 pos;
     vec3 viewing;
-    vec3 normal;
+	vec3 normal;
+	// normal can be used as a barycentric coordinate. Code below screws with constructors, so nah.
+	/*
+	union {
+    	vec3 normal;
+		vec3 barycentric;
+	};
+	*/
     Material* material;
 };
 
@@ -93,8 +128,11 @@ struct Object {
     Object(int old_id);
 
     virtual void ImGui() {}
+	// String representation for saving.
     virtual string Encode() { return ""; }
     virtual void Decode(string& s) {}
+	// Called once right before rendering, allows objects to finalize intermediate data
+	virtual void PreRender() {}
 
     string WithId(string s);
     bool operator==(Object rhs) { return id == rhs.id; }
@@ -106,7 +144,7 @@ struct Material : Object {
     Color specular = Color(0.2, 0.2, 0.2);
     Color transmissive = Color(0, 0, 0);
     float phong = 8.0f;
-    float ior = 0.0f;
+    float ior = 1.0f;
 
     using Object::Object;
 
@@ -129,6 +167,7 @@ struct Camera : Object {
     void ImGui();
     string Encode();
     void Decode(string& s);
+	void PreRender();
 };
 
 struct BoundingBox {
@@ -167,6 +206,34 @@ struct Sphere : Geometry {
     bool FindIntersection(Ray ray, HitInformation* intersection);
 	bool OverlapsCube(vec3 pos, float hwidth);
 	BoundingBox GetBoundingBox();
+};
+
+struct Triangle : Geometry {
+    vec3 v1 = vec3(), v2 = vec3(), v3 = vec3();
+
+    using Geometry::Geometry;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
+
+    bool FindIntersection(Ray ray, HitInformation* intersection);
+	bool OverlapsCube(vec3 pos, float hwidth);
+	BoundingBox GetBoundingBox();
+};
+
+struct NormalTriangle : Triangle  {
+    vec3 n1 = vec3(), n2 = vec3(), n3 = vec3();
+    
+    using Triangle::Triangle;
+
+    void ImGui();
+    string Encode();
+    void Decode(string& s);
+	void PreRender();
+
+    bool FindIntersection(Ray ray, HitInformation* intersection);
+
 };
 
 // Non-enforced abstract class for lights
@@ -248,15 +315,17 @@ Color EvaluateRay(Ray ray);
 Color CalculateDiffuse(Light* light, HitInformation hit);
 Color CalculateSpecular(Light* light, HitInformation hit);
 Color CalculateAmbient(HitInformation hit);
-Ray Reflect(vec3 ang, vec3 pos, vec3 norm, int bounces_left);
 
 void Reset();
 void Load();
 void Save();
 void Render();
+void RenderOne();
 
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
 void DisplayImage(string name);
+
+void RequestRender();
 
 }  // namespace P3
 

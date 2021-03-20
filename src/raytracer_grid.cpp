@@ -33,8 +33,8 @@ void Grid::AddGeometry(Geometry* geo) {
 
 // TODO: cull bounding box
 void Grid::RemoveGeometry(Geometry* geo) {
-	for (auto& [key, value] : objects) {
-		remove(value.begin(), value.end(), geo);
+	for (auto const& kvp : objects) {
+		value.erase(remove(value.begin(), value.end(), geo));
 	}
 }
 

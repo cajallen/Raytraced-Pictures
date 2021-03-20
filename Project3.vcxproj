@@ -132,6 +132,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>SDL2.lib;SDL2main.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -244,6 +245,7 @@
     <ClInclude Include="src\lib\SDL2-2.0.14\include\SDL_vulkan.h" />
     <ClInclude Include="src\lib\stb_image.h" />
     <ClInclude Include="src\lib\stb_image_write.h" />
+    <ClInclude Include="src\lib\vec3.h" />
     <ClInclude Include="src\raytracer_main.h" />
     <ClInclude Include="src\lib\geom_lib\multivector.h" />
     <ClInclude Include="src\lib\glad\glad.h" />

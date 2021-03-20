@@ -2,8 +2,20 @@
 
 namespace P3 {
 
+vector<vec3> vertices{};
+int vertex_i = 0;
+vector<vec3> normals{};
+int normal_i = 0;
+
 string rest_if_prefix(const string prefix, string content) {
     return content.compare(0, prefix.length(), prefix) == 0 ? content.substr(prefix.length()) : "";
+}
+
+vec3 DecodeVertex(string& s) {
+	stringstream ss(s);
+	vec3 new_vert;
+	ss >> new_vert.x >> new_vert.y >> new_vert.z;
+	return new_vert;
 }
 
 void Camera::Decode(string& s) {
@@ -70,6 +82,31 @@ void Sphere::Decode(string& s) {
     ss >> position.x >> position.y >> position.z >> radius;
 }
 
+void Triangle::Decode(string& s) {
+	stringstream ss(s);
+	int i_v1, i_v2, i_v3;
+	ss >> i_v1 >> i_v2 >> i_v3;
+	IM_ASSERT(i_v1 < vertices.size() && i_v2 < vertices.size() && i_v3 < vertices.size());
+	v1 = vertices.at(i_v1);
+	v2 = vertices.at(i_v2);
+	v3 = vertices.at(i_v3);
+}
+
+
+void NormalTriangle::Decode(string& s) {
+	stringstream ss(s);
+	int i_v1, i_v2, i_v3, i_n1, i_n2, i_n3;
+	ss >> i_v1 >> i_v2 >> i_v3 >> i_n1 >> i_n2 >> i_n3;
+	IM_ASSERT(i_v1 < vertices.size() && i_v2 < vertices.size() && i_v3 < vertices.size());
+	IM_ASSERT(i_n1 < normals.size() && i_n2 < normals.size() && i_n3 < normals.size());
+	v1 = vertices.at(i_v1);
+	v2 = vertices.at(i_v2);
+	v3 = vertices.at(i_v3);
+	n1 = normals.at(i_n1).normalized();
+	n2 = normals.at(i_n2).normalized();
+	n3 = normals.at(i_n3).normalized();
+}
+
 void Light::Decode(string& s) {
     stringstream ss(s);
     ss >> color.r >> color.g >> color.b;
@@ -109,7 +146,8 @@ string Camera::Encode() {
     osss << "camera_up:" << up.x << up.y << up.z;
     osss << "camera_fov_ha:" << half_vfov;
     osss << "film_resolution:" << res[0] << res[1];
-    osss << "output_image:" << output_name;
+    osss << "output_image: ";
+	oss << output_name;
     osss << "background:" << background_color.r << background_color.g << background_color.b;
     osss << "max_depth:" << max_depth << "";
 
@@ -117,7 +155,8 @@ string Camera::Encode() {
 }
 
 string Material::Encode() {
-    ostringstream oss("material:");
+    ostringstream oss;
+	oss << "material:";
     ossstream osss(oss);
     osss << ambient.r << ambient.g << ambient.b << diffuse.r << diffuse.g << diffuse.b << specular.r << specular.g
         << specular.b << phong << transmissive.r << transmissive.g << transmissive.b << ior;
@@ -125,15 +164,41 @@ string Material::Encode() {
 }
 
 string Geometry::Encode() {
-    string temp = material->Encode();
-    temp += "\n";
+    string temp = "\n" + material->Encode() + "\n";
     return temp;
 }
 
 string Sphere::Encode() {
-    ostringstream oss(Geometry::Encode() + "sphere:");
+    ostringstream oss;
+	oss << Geometry::Encode() << "sphere:";
     ossstream osss(oss);
     osss << position.x << position.y << position.z << radius;
+    return oss.str();
+}
+
+string Triangle::Encode() {
+    ostringstream oss;
+	oss << Geometry::Encode() << endl;
+    oss << v1.keyed_string("vertex: ") << endl;
+	oss << v2.keyed_string("vertex: ") << endl;
+	oss << v3.keyed_string("vertex: ");
+	ossstream osss(oss);
+    osss << "triangle:" << vertex_i++ << vertex_i++ << vertex_i++;
+    return oss.str();
+}
+
+string NormalTriangle::Encode() {
+    ostringstream oss;
+	oss << Geometry::Encode() << endl;
+    oss << v1.keyed_string("vertex: ") << endl;
+	oss << v2.keyed_string("vertex: ") << endl;
+	oss << v3.keyed_string("vertex: ") << endl;
+	oss << n1.keyed_string("normal: ") << endl;
+	oss << n2.keyed_string("normal: ") << endl;
+	oss << n3.keyed_string("normal: ");
+	ossstream osss(oss);
+    osss << "normal_triangle:" << vertex_i++ << vertex_i++ << vertex_i++
+		 << normal_i++ << normal_i++ << normal_i++;
     return oss.str();
 }
 
@@ -150,21 +215,24 @@ string AmbientLight::Encode() {
 }
 
 string DirectionalLight::Encode() {
-    ostringstream oss("directional_light:" + Light::Encode());
+    ostringstream oss;
+	oss << "directional_light:" << Light::Encode();
     ossstream osss(oss);
     osss << direction.x << direction.y << direction.z;
     return oss.str();
 }
 
 string PointLight::Encode() {
-    ostringstream oss("point_light:" + Light::Encode());
+    ostringstream oss;
+	oss << "point_light:" << Light::Encode();
     ossstream osss(oss);
     osss << position.x << position.y << position.z;
     return oss.str();
 }
 
 string SpotLight::Encode() {
-    ostringstream oss("spot_light:" + Light::Encode());
+    ostringstream oss;
+	oss << "spot_light:" << Light::Encode();
     ossstream osss(oss);
     osss << position.x << position.y << position.z << direction.x << direction.y << direction.z << angle1 << angle2;
     return oss.str();
@@ -184,13 +252,40 @@ void Load() {
         string rest;
 
         // Only camera can Decode this way because only camera is pseudostatic
+		// It does decode this way because otherwise we would need to check every line for all of its keys
         camera->Decode(line);
+
+		rest = rest_if_prefix("vertex: ", line);
+        if (rest != "") {
+            vec3 v = DecodeVertex(rest);
+            vertices.push_back(v);
+        }
+
+		rest = rest_if_prefix("normal: ", line);
+        if (rest != "") {
+            vec3 v = DecodeVertex(rest).normalized();
+            normals.push_back(v);
+        }
 
         rest = rest_if_prefix("sphere: ", line);
         if (rest != "") {
             Sphere* new_sphere = new Sphere();
             new_sphere->Decode(rest);
             shapes.push_back(new_sphere);
+        }
+
+		rest = rest_if_prefix("triangle: ", line);
+        if (rest != "") {
+            Triangle* new_triangle = new Triangle();
+            new_triangle->Decode(rest);
+            shapes.push_back(new_triangle);
+        }
+
+		rest = rest_if_prefix("normal_triangle: ", line);
+        if (rest != "") {
+            NormalTriangle* new_triangle = new NormalTriangle();
+            new_triangle->Decode(rest);
+            shapes.push_back(new_triangle);
         }
 
         rest = rest_if_prefix("material: ", line);
@@ -229,9 +324,15 @@ void Load() {
         }
     }
     scene_file.close();
+
+	RequestRender();
 }
 
 void Save() {
+	vertices.clear();
+    normals.clear();
+	vertex_i = 0;
+    normal_i = 0;
     if (string(scene_name) == "") {
         return;
     }

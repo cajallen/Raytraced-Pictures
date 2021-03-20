@@ -1,13 +1,6 @@
 // Main templated from Dear ImGui
 #include "raytracer_main.h"
 
-// any SAMPLING > 0 is randomly sampled.
-#define AA_RANDOM 4
-#define AA_NONE 0
-#define AA_FIVE -1
-
-#define SAMPLING AA_NONE
-
 inline float randf() {
     return rand() / (float)RAND_MAX;
 }
@@ -23,16 +16,40 @@ Camera* camera = new Camera();
 int entity_count = 0;
 char scene_name[256] = "";
 char output_name[256] = "raytraced.bmp";
+steady_clock::time_point last_request;
+bool update_automatically = false;
 
 ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
 
+Ray Ray::Reflect(vec3 dir_in, vec3 origin, vec3 dir_mirror, int bounces_left) {
+    vec3 ray_origin = origin + dir_mirror * 0.001;
+    vec3 midpoint = dir_mirror * dot(dir_in, dir_mirror);
+    vec3 out_dir = (2 * midpoint - dir_in).normalized();
+    return Ray(ray_origin, out_dir, bounces_left);
+}
 
-Ray Reflect(vec3 dir_in, vec3 origin, vec3 dir_mirror, int bounces_left) {
-	vec3 ray_origin = origin + dir_mirror * 0.001;
-	vec3 midpoint = dir_mirror * dot(dir_in, dir_mirror);
-	vec3 out_dir = (2*midpoint - dir_in).normalized();
-	return Ray(ray_origin, out_dir, bounces_left);
+Ray Ray::Refract(vec3 dir_in, vec3 origin, vec3 norm, float iorold, float iornew, int bounces_left) {
+    float ratio = (iorold / iornew);
+    float initial_ang = acos(dot(-dir_in, norm));
+    float new_ang = asin(ratio * sin(initial_ang));
+
+    float in_sqrt = 1 - pow(sin(new_ang), 2);
+    vec3 out_dir = ratio * dir_in + (ratio * cos(initial_ang) - sqrt(in_sqrt))*norm;
+
+    vec3 ray_origin = origin - norm * 0.001;
+    return Ray(ray_origin, out_dir.normalized(), bounces_left);
+
+    /*
+    float dot_in_norm = dot(dir_in, norm);
+    if (dot_in_norm) return Ray(vec3(), vec3(), -1);
+    float in_sqrt = 1 - ((iorold * iorold * (1 - pow(dot_in_norm, 2))) / (iornew * iornew));
+    if (in_sqrt < 0) return Ray(vec3(), vec3(), -1);
+	vec3 new_dir = (iorold*(dir_in-norm*dot(dir_in,norm)))*(1/iornew) - norm * sqrt(in_sqrt);
+
+	vec3 ray_origin = origin - norm * 0.001;
+	return Ray(ray_origin, new_dir, bounces_left);
+    */
 }
 
 // Call without index to create new shapes
@@ -96,53 +113,141 @@ void Light::ClampColor() {
 
 bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
     vec3 toStart = (ray.pos - position);
-    float b = 2 * dot(ray.dir, toStart);
+    float b = 2.0 * dot(ray.dir, toStart);
     float c = dot(toStart, toStart) - pow(radius, 2);
-    float discr = pow(b, 2) - 4 * c;
+    float discr = pow(b, 2) - 4.0 * c;
 
+	// no solutions to quadratic equation
     if (discr < 0)
         return false;
 
-    float t0 = (-b + sqrt(discr)) / 2;
-    float t1 = (-b - sqrt(discr)) / 2;
-    float mint = t0;
-    if (t1 > 0.0 && t1 < t0)
-        mint = t1;
+	// t is the distance to the solutions of the line sphere intersection
+    float t0 = (-b + sqrt(discr)) / 2.0;
+    float t1 = (-b - sqrt(discr)) / 2.0;
+    float t_min = (0.0 < t1 && t1 < t0) ? t1 : t0;
 
-    if (mint < 0.0)
+    if (t_min < 0.0)
         return false;
 
-    vec3 hit_pos = ray.pos + mint * ray.dir;
+    vec3 hit_pos = ray.pos + t_min * ray.dir;
     vec3 hit_norm = (hit_pos - position).normalized();
-    *intersection = HitInformation{mint, hit_pos, ray.dir, hit_norm, material};
+    *intersection = HitInformation{t_min, hit_pos, ray.dir, hit_norm, material};
 
     return true;
 }
 
+// OPTIMIZATION: 
+bool Triangle::FindIntersection(Ray ray, HitInformation* intersection) {
+	// Doesn't really matter how we do this. This gives us CCW winding.
+    vec3 edge1 = v2 - v1;
+    vec3 edge2 = v3 - v1;
+
+    vec3 norm = cross(edge1, edge2);
+    float d = (dot(ray.dir, norm));
+    if (d == 0) return false; // Parallel
+    float t = -(dot(ray.pos, norm) + -dot(norm, v1)) / d;
+    vec3 plane_point = ray.pos + ray.dir * t;
+
+	// intersection is behind point
+	if (t <= 0) return false;
+    // intersection outside of point
+    bool same_side_v1 = same_side(plane_point, v1, v2, v3);
+    bool same_side_v2 = same_side(plane_point, v2, v1, v3);
+    bool same_side_v3 = same_side(plane_point, v3, v1, v2);
+    if (!same_side_v1 || !same_side_v2 || !same_side_v3)
+        return false;
+
+	intersection->pos = plane_point;
+	intersection->dist = t;
+	intersection->material = material;
+    intersection->viewing = ray.dir;
+	intersection->normal = d < 0 ? norm : -norm;
+	return true;
+}
+
+// TODO: aint too happy that this doesn't reuse code. Finding the plane point is mutual.
+bool NormalTriangle::FindIntersection(Ray ray, HitInformation* intersection) {
+    vec3 edge1 = v2 - v1;
+    vec3 edge2 = v3 - v1;
+
+    vec3 norm = cross(edge1, edge2);
+    float d = (dot(ray.dir, norm));
+    if (d == 0) return false; // Parallel
+    float t = -(dot(ray.pos, norm) + -dot(norm, v1)) / d;
+    vec3 plane_point = ray.pos + ray.dir * t;
+
+    // intersection is behind point
+    if (t <= 0) return false;
+    // intersection outside of point
+	float triangle_area = norm.mag();
+	float area_1 = cross(v2 - v3, plane_point - v3).mag() / triangle_area;
+	float area_2 = cross(v3 - v1, plane_point - v1).mag() / triangle_area;
+    float area_3 = cross(v1 - v2, plane_point - v2).mag() / triangle_area;
+	if (area_1 > 1 || area_2 > 1 || area_3 > 1 || (area_1+area_2+area_3) > (1 + 100*FLT_EPSILON)) return false;
+
+    intersection->pos = plane_point;
+    intersection->dist = t;
+    intersection->material = material;
+    intersection->viewing = ray.dir;
+	vec3 out_norm = n1*area_1 + n2*area_2 + n3*area_3;
+    intersection->normal = out_norm;
+    return true;
+}
+
+
+void NormalTriangle::PreRender() {
+	n1 = n1.normalized();
+	n2 = n2.normalized();
+	n3 = n3.normalized();
+}
+
+
+
 BoundingBox Sphere::GetBoundingBox() {
-	BoundingBox bb;
-	bb.min = position - vec3(radius, radius, radius);
-	bb.max = position + vec3(radius, radius, radius);
+    BoundingBox bb;
+    bb.min = position - vec3(radius, radius, radius);
+    bb.max = position + vec3(radius, radius, radius);
+    return bb;
+}
+
+BoundingBox Triangle::GetBoundingBox() {
+	BoundingBox bb{v1, v1};
+	for (int i = 0; i < 3; i++) {
+		bb.min[i] = fmin(bb.min[i], fmin(v2[i], v3[i]));
+		bb.max[i] = fmax(bb.max[i], fmax(v2[i], v3[i]));
+	}
 	return bb;
 }
 
+
 bool Sphere::OverlapsCube(vec3 pos, float hwidth) {
-	float d = 0;
-	for (int i = 0; i < 3; i++) {
-		float min = pos[i] - hwidth;
-		float max = pos[i] + hwidth;
-		if (position[i] < min) {
-			float axis_d = position[i] - min;
-			d += axis_d * axis_d;
-		}
-		else if (position[i] > max) {
-			float axis_d = position[i] - max;
-			d += axis_d * axis_d;
-		}
-	}
-	return d < radius * radius;
+    float d = 0;
+    for (int i = 0; i < 3; i++) {
+        float min = pos[i] - hwidth;
+        float max = pos[i] + hwidth;
+        if (position[i] < min) {
+            float axis_d = position[i] - min;
+            d += axis_d * axis_d;
+        } else if (position[i] > max) {
+            float axis_d = position[i] - max;
+            d += axis_d * axis_d;
+        }
+    }
+    return d < radius * radius;
 }
 
+// OPTIMIZATION: This is not correct.
+bool Triangle::OverlapsCube(vec3 pos, float hwidth) {
+	// This could be implemented, but it's written by a person who cannot code for their life.
+    // https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/code/tribox3.txt
+	BoundingBox bb = GetBoundingBox();
+	vec3 other_min = pos - vec3(hwidth, hwidth, hwidth);
+	vec3 other_max = pos + vec3(hwidth, hwidth, hwidth);
+	bool x_overlaps = (bb.max.x > other_min.x && bb.min.x < other_max.x);
+	bool y_overlaps = (bb.max.y > other_min.y && bb.min.y < other_max.y);
+	bool z_overlaps = (bb.max.z > other_min.z && bb.min.z < other_max.z);
+	return x_overlaps && y_overlaps && z_overlaps;
+}
 
 Ray DirectionalLight::ReverseLightRay(vec3 from) {
     return Ray{from, -direction, -1};
@@ -216,14 +321,15 @@ void Reset() {
     lights.clear();
     ambient_lights.clear();
     materials.clear();
+	vertices.clear();
+    normals.clear();
 
-    strcpy(output_name, "");
+    strcpy(output_name, "raytraced.bmp");
 
     entity_count = 0;
     materials.push_back(new Material());
     camera = new Camera();
 }
-
 
 Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
@@ -243,8 +349,17 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
         current = current + CalculateDiffuse(light, hit_info);
         current = current + CalculateSpecular(light, hit_info);
     }
-    Ray reflected = Reflect(-hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
+    Ray reflected = Ray::Reflect(hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
+	reflected.last_material = hit_info.material;
     current = current + hit_info.material->specular * EvaluateRay(reflected);
+
+	Material* last_mat = ray.last_material;
+	float last_ior = 1.0;
+	if (last_mat != NULL) last_ior = last_mat->ior;
+	Ray refracted = Ray::Refract(hit_info.viewing, hit_info.pos, hit_info.normal, last_ior, hit_info.material->ior, ray.bounces_left - 1);
+	if (refracted.bounces_left != -1)
+        current = current + hit_info.material->transmissive * EvaluateRay(refracted);
+
     current = current + CalculateAmbient(hit_info);
 
     return current;
@@ -272,7 +387,7 @@ Color CalculateDiffuse(Light* light, HitInformation hit) {
 Color CalculateSpecular(Light* light, HitInformation hit) {
     vec3 to_light = light->ReverseLightRay(hit.pos).dir;
     vec3 to_viewer = -hit.viewing;
-    Ray test = Reflect(to_light, hit.pos, hit.normal, -1);
+    Ray test = Ray::Reflect(to_light, hit.pos, hit.normal, -1);
     float amount = pow(max(0, dot(test.dir, to_viewer)), hit.material->phong);
 
     Color il = light->Intensity(hit.pos);
@@ -293,6 +408,10 @@ Color CalculateAmbient(HitInformation hit) {
 void Render() {
     float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
 
+    camera->PreRender();
+    for (Geometry* geo : shapes) geo->PreRender();
+    for (Light* light : lights) light->PreRender();
+
     for (Light* light : lights) {
         light->UpdateMult();
         AmbientLight* al = dynamic_cast<AmbientLight*>(light);
@@ -302,15 +421,15 @@ void Render() {
     }
 
     Image outputImg = Image(camera->res[X], camera->res[Y]);
-
-#pragma omp parallel for num_threads(16) schedule(dynamic, camera->res[X])
+#ifndef _DEBUG
+#pragma omp parallel for num_threads((int) (omp_get_thread_limit() * 0.75)) schedule(dynamic, camera->res[X])
+#endif
     for (int i = 0; i < camera->res[X] * camera->res[Y]; i++) {
         int x = i % camera->res[X];
         int y = i / camera->res[X];
         vector<ImVec2> offsets;
 #if SAMPLING == -1
-        offsets = {ImVec2(0.50, 0.50), ImVec2(0.15, 0.15), ImVec2(0.85, 0.15), ImVec2(0.85, 0.85),
-                    ImVec2(0.15, 0.85)};
+        offsets = {ImVec2(0.50, 0.50), ImVec2(0.15, 0.15), ImVec2(0.85, 0.15), ImVec2(0.85, 0.85), ImVec2(0.15, 0.85)};
 #elif SAMPLING == 0
         offsets = {ImVec2(0.5, 0.5)};
 #else
@@ -343,6 +462,40 @@ void Render() {
     outputImg.write(relative_output_name.c_str());
 }
 
+void RenderOne() {
+    camera->PreRender();
+    for (Geometry* geo : shapes) geo->PreRender();
+    for (Light* light : lights) light->PreRender();
+
+    for (Light* light : lights) {
+        light->UpdateMult();
+        AmbientLight* al = dynamic_cast<AmbientLight*>(light);
+        if (al != NULL) {
+            ambient_lights.push_back(al);
+        }
+    }
+
+    Color col = Color(0, 0, 0);
+    float u = camera->mid_res[X];
+    float v = camera->mid_res[Y];
+
+    vec3 rayDir = (-camera->forward).normalized();
+
+    Ray ray = Ray(camera->position, rayDir, camera->max_depth);
+    Color new_color = EvaluateRay(ray);
+    new_color.Clamp();
+
+    ambient_lights.clear();
+
+    for (Light* light : lights) {
+        light->ClampColor();
+    }
+}
+
+void RequestRender() {
+    last_request = chrono::steady_clock::now();
+}
+
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection) {
     HitInformation current_inter;
     float dist = -1.0;
@@ -368,6 +521,9 @@ void DisplayImage(string name) {
 
 using namespace P3;
 
+// TODO: move more code out of main.
+// TODO: Changing program state shouldn't happen during a render call.
+// This can throw exceptions if we change something like image size during a render.
 // Main code
 int main(int argc, char** argv) {
     // Setup SDL
@@ -406,7 +562,7 @@ int main(int argc, char** argv) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    (void)io;
+    (void)io; // ?
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -439,10 +595,18 @@ int main(int argc, char** argv) {
 
         ImGui::Begin("Renderer Settings");
 
-
-        if (ImGui::Button("Render", ImVec2(ImGui::GetWindowWidth(), 0))) {
+        duration<double> span = duration_cast<duration<double>>(steady_clock::now() - last_request);
+        bool time_update = update_automatically && (last_request != steady_clock::time_point() && span.count() > RENDER_DELAY);
+        if (ImGui::Button("Render", ImVec2(ImGui::GetWindowWidth() *0.5, 0)) || time_update) {
+            last_request = steady_clock::time_point();
             render_call = async(Render);
         }
+        ImGui::SameLine();
+        if (ImGui::Button("RenderOne", ImVec2(ImGui::GetWindowWidth() * 0.25, 0))) {
+            RenderOne();
+        }
+        ImGui::SameLine();
+        ImGui::Checkbox("Auto", &update_automatically);
 
         if (ImGui::Button("Save")) {
             Save();
@@ -455,50 +619,61 @@ int main(int argc, char** argv) {
         ImGui::InputTextWithHint("", "<scene filename>", scene_name, 256, ImGuiInputTextFlags_CharsNoBlank);
         ImGui::InputTextWithHint("Output Name", "output.png", output_name, 256, ImGuiInputTextFlags_CharsNoBlank);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 0.7, 0.7, 1.0, 1.0 });
-        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{ 0.4, 0.4, 0.5, 1.0 });
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0.7, 0.7, 1.0, 1.0});
+        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImVec4{0.4, 0.4, 0.5, 1.0});
         camera->ImGui();
         ImGui::PopStyleColor(2);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 0.7, 0.7, 1.0 });
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 0.7, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Geometry")) {
             for (Geometry* shape : shapes) {
                 shape->ImGui();
             }
-            if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth(), 0))) {
+            if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth() / 3 - H_SPACING * 2, 0))) {
                 Material* mat = new Material();
                 materials.push_back(mat);
                 shapes.push_back(new Sphere());
             }
+			ImGui::SameLine(0.0f, H_SPACING);
+            if (ImGui::Button("New Triangle", ImVec2(ImGui::GetWindowWidth() / 3 - H_SPACING * 2, 0))) {
+                Material* mat = new Material();
+                materials.push_back(mat);
+                shapes.push_back(new Triangle());
+            }
+			ImGui::SameLine(0.0f, H_SPACING);
+            if (ImGui::Button("New NormTriangle", ImVec2(ImGui::GetWindowWidth() / 3 - H_SPACING * 2, 0))) {
+                Material* mat = new Material();
+                materials.push_back(mat);
+                shapes.push_back(new NormalTriangle());
+            }
         }
         ImGui::PopStyleColor();
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{ 1.0, 1.0, 0.7, 1.0 });
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{1.0, 1.0, 0.7, 1.0});
         if (ImGui::CollapsingHeader("Lighting")) {
-            float spacing = 4.0f;
             for (Light* light : lights) {
                 light->ImGui();
             }
-            if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
+            if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
                 lights.push_back(new AmbientLight());
             }
-            ImGui::SameLine(0.0f, spacing);
-            if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
+            ImGui::SameLine(0.0f, H_SPACING);
+            if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
                 lights.push_back(new PointLight());
             }
-            ImGui::SameLine(0.0f, spacing);
-            if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
+            ImGui::SameLine(0.0f, H_SPACING);
+            if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
                 lights.push_back(new SpotLight());
             }
-            ImGui::SameLine(0.0f, spacing);
-            if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - spacing * 2, 0))) {
+            ImGui::SameLine(0.0f, H_SPACING);
+            if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
                 lights.push_back(new DirectionalLight());
             }
         }
         ImGui::PopStyleColor();
 
         if (render_call.valid()) {
-            render_call.get(); // Calling get makes the render_call invalid, storing that we used it.
+            render_call.get();  // Calling get makes the render_call invalid, storing that we used it.
             string relative_output_name = "output/" + string(output_name);
             if (_access(relative_output_name.c_str(), 0) != -1)
                 DisplayImage(relative_output_name);
@@ -515,7 +690,6 @@ int main(int argc, char** argv) {
         // Rendering
         ImGui::Render();
 
-
         glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
         glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -523,6 +697,7 @@ int main(int argc, char** argv) {
         SDL_GL_SwapWindow(window);
     }
 
+    delete camera;
     for (Geometry* geo : shapes) {
         delete geo;
     }

@@ -3,6 +3,12 @@
 
 #include <math.h>
 #include <ostream>
+#include <string>
+#include <stdexcept>
+
+using std::string;
+using std::to_string;
+using std::runtime_error;
 
 inline float fclamp(float a, float min, float max) {
     return fmax(min, fmin(a, max));
@@ -15,17 +21,18 @@ struct vec3i {
     vec3i() : x(0), y(0), z(0) {}
 };
 
-vec3i imin(vec3i a, vec3i b) {
-	return vec3i(min(a.x, b.x), min(a.y, b.y), min(a.z, b.z));
+
+inline vec3i imin(vec3i a, vec3i b) {
+	return vec3i(fmin(a.x, b.x), fmin(a.y, b.y), fmin(a.z, b.z));
 }
 
-vec3i imax(vec3i a, vec3i b) {
-	return vec3i(max(a.x, b.x), max(a.y, b.y), max(a.z, b.z));
+inline vec3i imax(vec3i a, vec3i b) {
+	return vec3i(fmax(a.x, b.x), fmax(a.y, b.y), fmax(a.z, b.z));
 }
 
+#define BASE 16
 template<>
-struct hash<vec3i>{
-	#define BASE 16
+struct std::hash<vec3i>{
 	size_t operator()(const vec3i& v) const {
 		return v.x * (BASE*BASE) + v.y * BASE + v.z;
 	}
@@ -64,6 +71,10 @@ struct vec3 {
 
 	vec3 operator-() const {
 		return vec3(-x, -y, -z);
+	}
+
+	string keyed_string(string prefix) {
+		return prefix + to_string(x) + " " + to_string(y) + " " + to_string(z);
 	}
 
 	float& operator[](int index) {
@@ -105,6 +116,12 @@ inline vec3 operator-(vec3 a, vec3 b) {
 
 inline std::ostream& operator<<(std::ostream& os, vec3 v3) {
     return os << "{" << v3.x << ", " << v3.y << ", " << v3.z << "}";
+}
+
+inline bool same_side(vec3 p1, vec3 p2, vec3 a, vec3 b) {
+    vec3 cp1 = cross(b - a, p1 - a);
+    vec3 cp2 = cross(b - a, p2 - a);
+    return dot(cp1, cp2) >= 0;
 }
 
 #endif
