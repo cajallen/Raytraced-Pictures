@@ -2,10 +2,7 @@
 
 namespace P3 {
 
-vector<vec3> vertices{};
-int vertex_i = 0;
-vector<vec3> normals{};
-int normal_i = 0;
+LoadState load_state{};
 
 string rest_if_prefix(const string prefix, string content) {
     return content.compare(0, prefix.length(), prefix) == 0 ? content.substr(prefix.length()) : "";
@@ -86,10 +83,11 @@ void Triangle::Decode(string& s) {
 	stringstream ss(s);
 	int i_v1, i_v2, i_v3;
 	ss >> i_v1 >> i_v2 >> i_v3;
-	IM_ASSERT(i_v1 < vertices.size() && i_v2 < vertices.size() && i_v3 < vertices.size());
-	v1 = vertices.at(i_v1);
-	v2 = vertices.at(i_v2);
-	v3 = vertices.at(i_v3);
+    int vsize = load_state.vertices.size();
+	IM_ASSERT(i_v1 < vsize && i_v2 < vsize && i_v3 < vsize);
+	v1 = load_state.vertices.at(i_v1);
+	v2 = load_state.vertices.at(i_v2);
+	v3 = load_state.vertices.at(i_v3);
 }
 
 
@@ -97,14 +95,16 @@ void NormalTriangle::Decode(string& s) {
 	stringstream ss(s);
 	int i_v1, i_v2, i_v3, i_n1, i_n2, i_n3;
 	ss >> i_v1 >> i_v2 >> i_v3 >> i_n1 >> i_n2 >> i_n3;
-	IM_ASSERT(i_v1 < vertices.size() && i_v2 < vertices.size() && i_v3 < vertices.size());
-	IM_ASSERT(i_n1 < normals.size() && i_n2 < normals.size() && i_n3 < normals.size());
-	v1 = vertices.at(i_v1);
-	v2 = vertices.at(i_v2);
-	v3 = vertices.at(i_v3);
-	n1 = normals.at(i_n1).normalized();
-	n2 = normals.at(i_n2).normalized();
-	n3 = normals.at(i_n3).normalized();
+    int vsize = load_state.vertices.size();
+    int nsize = load_state.normals.size();
+	IM_ASSERT(i_v1 < vsize && i_v2 < vsize && i_v3 < vsize);
+	IM_ASSERT(i_n1 < nsize && i_n2 < nsize && i_n3 < nsize);
+	v1 = load_state.vertices.at(i_v1);
+	v2 = load_state.vertices.at(i_v2);
+	v3 = load_state.vertices.at(i_v3);
+	n1 = load_state.normals.at(i_n1).normalized();
+	n2 = load_state.normals.at(i_n2).normalized();
+	n3 = load_state.normals.at(i_n3).normalized();
 }
 
 void Light::Decode(string& s) {
@@ -183,7 +183,7 @@ string Triangle::Encode() {
 	oss << v2.keyed_string("vertex: ") << endl;
 	oss << v3.keyed_string("vertex: ");
 	ossstream osss(oss);
-    osss << "triangle:" << vertex_i++ << vertex_i++ << vertex_i++;
+    osss << "triangle:" << load_state.vertex_i++ << load_state.vertex_i++ << load_state.vertex_i++;
     return oss.str();
 }
 
@@ -197,8 +197,8 @@ string NormalTriangle::Encode() {
 	oss << n2.keyed_string("normal: ") << endl;
 	oss << n3.keyed_string("normal: ");
 	ossstream osss(oss);
-    osss << "normal_triangle:" << vertex_i++ << vertex_i++ << vertex_i++
-		 << normal_i++ << normal_i++ << normal_i++;
+    osss << "normal_triangle:" << load_state.vertex_i++ << load_state.vertex_i++ << load_state.vertex_i++
+		 << load_state.normal_i++ << load_state.normal_i++ << load_state.normal_i++;
     return oss.str();
 }
 
@@ -258,13 +258,13 @@ void Load() {
 		rest = rest_if_prefix("vertex: ", line);
         if (rest != "") {
             vec3 v = DecodeVertex(rest);
-            vertices.push_back(v);
+            load_state.vertices.push_back(v);
         }
 
 		rest = rest_if_prefix("normal: ", line);
         if (rest != "") {
             vec3 v = DecodeVertex(rest).normalized();
-            normals.push_back(v);
+            load_state.normals.push_back(v);
         }
 
         rest = rest_if_prefix("sphere: ", line);
@@ -329,10 +329,7 @@ void Load() {
 }
 
 void Save() {
-	vertices.clear();
-    normals.clear();
-	vertex_i = 0;
-    normal_i = 0;
+    load_state = LoadState();
     if (string(scene_name) == "") {
         return;
     }

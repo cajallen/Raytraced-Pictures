@@ -3,6 +3,12 @@
 #define UI_HSPACING 4
 #define TAB_SIZE 6.0
 
+float cameraView[16] = { 1.f, 0.f, 0.f, 0.f,
+                 0.f, 1.f, 0.f, 0.f,
+                 0.f, 0.f, 1.f, 0.f,
+                 0.f, 0.f, 0.f, 1.f };
+float cameraDistance = 8.0f;
+bool print_debug = false;
 namespace P3 {
 
 string Object::WithId(string s) {
@@ -13,16 +19,29 @@ void Camera::PreRender() {
 	mid_res = { res[X] / 2, res[Y] / 2 };
 
 	forward = forward.normalized();
-	right = cross(up, forward).normalized();
-	up = cross(forward, right).normalized();
+	right = cross(forward, up).normalized();
+	up = cross(right, forward).normalized();
+}
+
+void MatrixToForwardUp(float* mat, vec3& forward, vec3& up) {
+    forward = vec3(mat[2], mat[6], mat[10]).normalized();
+    up = vec3(mat[1], mat[5], mat[9]).normalized();
 }
 
 void Camera::ImGui() {
 	bool updated = false;
     if (ImGui::CollapsingHeader("Camera Parameters")) {
-		updated |= ImGui::DragFloat3("Camera Position", &position.x, 0.1);
-        updated |= ImGui::SliderFloat3("Camera Forward", &forward.x, -1.0, 1.0);
-        updated |= ImGui::SliderFloat3("Camera Up", &up.x, -1.0, 1.0);
+        ImGuiIO& io = ImGui::GetIO();
+
+        ImGuizmo::SetDrawlist();
+        float viewManipulateRight = ImGui::GetWindowPos().x + (float)ImGui::GetWindowWidth();
+        float viewManipulateTop = ImGui::GetWindowPos().y + ImGui::GetItemRectMax().y - ImGui::GetWindowPos().y;
+        updated |= ImGuizmo::ViewManipulate(cameraView, cameraDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
+        MatrixToForwardUp(cameraView, forward, up);
+        ImGui::DragFloat3("camera_forward", &forward.x, 0.0, 0.0, 0.0, "%.1f", ImGuiSliderFlags_NoInput);
+        ImGui::DragFloat3("camera_up", &up.x, 0.0, 0.0, 0.0, "%.1f", ImGuiSliderFlags_NoInput);
+
+        updated |= ImGui::DragFloat3("Camera Pos", &position.x, 0.1);
         updated |= ImGui::SliderFloat("FOV", &half_vfov, 0.0, 180.0);
         updated |= ImGui::DragInt2("Resolution", &res[0], 1);
         updated |= ImGui::SliderInt("Max Depth", &max_depth, 1, 8);
@@ -135,7 +154,7 @@ void AmbientLight::ImGui() {
     ImGui::Indent(TAB_SIZE);
     if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
         updated |= ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.05);
-        updated |= ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
+        updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -150,7 +169,7 @@ void PointLight::ImGui() {
     if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
         updated |= ImGui::DragFloat3(WithId("position##").c_str(), &position.x, 0.1);
         updated |= ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01, 1000.0);
-        updated |= ImGui::ColorPicker3(WithId("color##").c_str(), &color.r);
+        updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();
         }
@@ -230,5 +249,34 @@ bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_wid
 
     return true;
 }
+
+
+void DisplayImage(string name) {
+    int im_x, im_y;
+    bool ret = LoadTextureFromFile(name.c_str(), &disp_img_tex, &im_x, &im_y);
+    disp_img_size = ImVec2(im_x, im_y);
+    IM_ASSERT(ret);
+}
+
+void Log(string s) {
+    debug_log.push_back(s);
+    if (debug_log.size() > 100) {
+        debug_log.erase(debug_log.begin(), debug_log.begin() + 20);
+    }
+}
+
+void DisplayLog() {
+    ImGui::Checkbox("Show Debug Log", &print_debug);
+    ImGui::SameLine();
+    if (ImGui::Button("Clear")) debug_log.clear();
+    if (print_debug) {
+        ImGui::BeginChild("Log");
+        for (string s : debug_log) {
+            ImGui::Text(s.c_str());
+        }
+        ImGui::EndChild();
+    }
+}
+
 
 }  // namespace P3

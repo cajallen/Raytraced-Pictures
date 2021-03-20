@@ -5,6 +5,7 @@
 #include <ostream>
 #include <string>
 #include <stdexcept>
+#include <iomanip>
 
 using std::string;
 using std::to_string;
@@ -73,6 +74,7 @@ struct vec3 {
 		return vec3(-x, -y, -z);
 	}
 
+
 	string keyed_string(string prefix) {
 		return prefix + to_string(x) + " " + to_string(y) + " " + to_string(z);
 	}
@@ -115,7 +117,7 @@ inline vec3 operator-(vec3 a, vec3 b) {
 }
 
 inline std::ostream& operator<<(std::ostream& os, vec3 v3) {
-    return os << "{" << v3.x << ", " << v3.y << ", " << v3.z << "}";
+    return os << std::fixed << std::setprecision(2) << "{" << v3.z << ", " << v3.y << "}";
 }
 
 inline bool same_side(vec3 p1, vec3 p2, vec3 a, vec3 b) {

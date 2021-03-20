@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include "ImGuizmo.h"
 
 using std::array;
 using std::cout;
@@ -27,19 +28,22 @@ using std::stringstream;
 using std::vector;
 using namespace std::chrono;
 
-#define X 0
-#define Y 1
-
-#define RENDER_DELAY 0.1
-
-// any SAMPLING > 0 is randomly sampled.
+// User settings
 #define AA_RANDOM 4
 #define AA_NONE 0
 #define AA_FIVE -1
+#define SAMPLING AA_NONE // any SAMPLING > 0 is randomly sampled.
+#define RENDER_DELAY 0.01
 
-#define SAMPLING AA_NONE
-
+// Constants
+#define RAY_EPSILON 0.001
 #define H_SPACING 4
+#define CHARARRAY_LEN
+
+// Readability
+#define X 0
+#define Y 1
+
 
 namespace P3 {
 
@@ -51,19 +55,16 @@ struct Light;
 struct AmbientLight;
 
 // UI STATE
+extern int entity_count;
+extern Camera* camera;
 extern vector<Geometry*> shapes;
 extern vector<Light*> lights;
-extern vector<AmbientLight*> ambient_lights;
 extern vector<Material*> materials;
-extern Camera* camera;
-extern int entity_count;
-extern char scene_name[256];
-extern char output_name[256];
+extern vector<AmbientLight*> ambient_lights;
+extern char scene_name[CHARARRAY_LEN];
+extern char output_name[CHARARRAY_LEN];
 extern steady_clock::time_point last_request;
-extern int vertex_i;
-extern vector<vec3> vertices;
-extern int normal_i;
-extern vector<vec3> normals;
+extern vector<string> debug_log;
 
 extern ImVec2 disp_img_size;
 extern GLuint disp_img_tex;
@@ -99,7 +100,7 @@ struct Ray {
 
     Ray(vec3 p, vec3 d, int b) : pos(p), dir(d.normalized()), bounces_left(b) {}
     static Ray Reflect(vec3 ang, vec3 pos, vec3 norm, int bounces_left);
-	static Ray Refract(vec3 dir_in, vec3 origin, vec3 norm, float iorold, float iornew, int bounces_left);
+	static Ray Refract(vec3 dir_in, vec3 origin, vec3 norm, float iornew, int bounces_left);
 };
 
 struct HitInformation {
@@ -213,11 +214,11 @@ struct Triangle : Geometry {
 
     using Geometry::Geometry;
 
-    void ImGui();
-    string Encode();
-    void Decode(string& s);
+    virtual void ImGui();
+    virtual string Encode();
+    virtual void Decode(string& s);
 
-    bool FindIntersection(Ray ray, HitInformation* intersection);
+    virtual bool FindIntersection(Ray ray, HitInformation* intersection);
 	bool OverlapsCube(vec3 pos, float hwidth);
 	BoundingBox GetBoundingBox();
 };
@@ -310,6 +311,15 @@ struct SpotLight : Light {
     Color Intensity(vec3 to);
 };
 
+struct LoadState {
+    int vertex_i = 0;
+    vector<vec3> vertices{};
+    int normal_i = 0;
+    vector<vec3> normals{};
+};
+
+extern LoadState load_state;
+
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 Color EvaluateRay(Ray ray);
 Color CalculateDiffuse(Light* light, HitInformation hit);
@@ -324,6 +334,8 @@ void RenderOne();
 
 bool LoadTextureFromFile(const char* filename, GLuint* out_texture, int* out_width, int* out_height);
 void DisplayImage(string name);
+void DisplayLog();
+void Log(string s);
 
 void RequestRender();
 

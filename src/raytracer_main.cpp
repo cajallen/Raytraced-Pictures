@@ -18,38 +18,37 @@ char scene_name[256] = "";
 char output_name[256] = "raytraced.bmp";
 steady_clock::time_point last_request;
 bool update_automatically = false;
+vector<string> debug_log{};
 
 ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
 
 Ray Ray::Reflect(vec3 dir_in, vec3 origin, vec3 dir_mirror, int bounces_left) {
-    vec3 ray_origin = origin + dir_mirror * 0.001;
+
     vec3 midpoint = dir_mirror * dot(dir_in, dir_mirror);
     vec3 out_dir = (2 * midpoint - dir_in).normalized();
-    return Ray(ray_origin, out_dir, bounces_left);
+    return Ray(origin, out_dir, bounces_left);
 }
 
-Ray Ray::Refract(vec3 dir_in, vec3 origin, vec3 norm, float iorold, float iornew, int bounces_left) {
-    float ratio = (iorold / iornew);
-    float initial_ang = acos(dot(-dir_in, norm));
-    float new_ang = asin(ratio * sin(initial_ang));
-
-    float in_sqrt = 1 - pow(sin(new_ang), 2);
-    vec3 out_dir = ratio * dir_in + (ratio * cos(initial_ang) - sqrt(in_sqrt))*norm;
-
-    vec3 ray_origin = origin - norm * 0.001;
-    return Ray(ray_origin, out_dir.normalized(), bounces_left);
-
-    /*
-    float dot_in_norm = dot(dir_in, norm);
-    if (dot_in_norm) return Ray(vec3(), vec3(), -1);
-    float in_sqrt = 1 - ((iorold * iorold * (1 - pow(dot_in_norm, 2))) / (iornew * iornew));
-    if (in_sqrt < 0) return Ray(vec3(), vec3(), -1);
-	vec3 new_dir = (iorold*(dir_in-norm*dot(dir_in,norm)))*(1/iornew) - norm * sqrt(in_sqrt);
-
-	vec3 ray_origin = origin - norm * 0.001;
-	return Ray(ray_origin, new_dir, bounces_left);
-    */
+Ray Ray::Refract(vec3 dir_in, vec3 origin, vec3 norm, float iornew, int bounces_left) {
+    float ratio = iornew;
+    float dotValue = dot(dir_in, norm);
+    // in direction opposite with normal, we're entering
+    if (dotValue < 0) {
+        ratio = (1 / iornew);
+    }
+    // in direction is aligned with normal; we're leaving
+    else {
+        dotValue = -dotValue;
+    }
+    float k = 1 - pow(ratio, 2) * (1 - pow(dotValue, 2));
+    if (k < 0)
+        return Ray(vec3(), vec3(), -1);
+    else {
+        vec3 dir_out = ratio * dir_in - (ratio * dotValue + sqrt(k)) * norm;
+        dir_out = dir_out.normalized();
+        return Ray(origin, dir_out, bounces_left);
+    }
 }
 
 // Call without index to create new shapes
@@ -124,9 +123,9 @@ bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
 	// t is the distance to the solutions of the line sphere intersection
     float t0 = (-b + sqrt(discr)) / 2.0;
     float t1 = (-b - sqrt(discr)) / 2.0;
-    float t_min = (0.0 < t1 && t1 < t0) ? t1 : t0;
+    float t_min = (RAY_EPSILON < t1 && t1 < t0) ? t1 : t0;
 
-    if (t_min < 0.0)
+    if (t_min < RAY_EPSILON)
         return false;
 
     vec3 hit_pos = ray.pos + t_min * ray.dir;
@@ -149,7 +148,7 @@ bool Triangle::FindIntersection(Ray ray, HitInformation* intersection) {
     vec3 plane_point = ray.pos + ray.dir * t;
 
 	// intersection is behind point
-	if (t <= 0) return false;
+	if (t <= RAY_EPSILON) return false;
     // intersection outside of point
     bool same_side_v1 = same_side(plane_point, v1, v2, v3);
     bool same_side_v2 = same_side(plane_point, v2, v1, v3);
@@ -173,12 +172,14 @@ bool NormalTriangle::FindIntersection(Ray ray, HitInformation* intersection) {
     vec3 norm = cross(edge1, edge2);
     float d = (dot(ray.dir, norm));
     if (d == 0) return false; // Parallel
+
     float t = -(dot(ray.pos, norm) + -dot(norm, v1)) / d;
+    // intersection is behind point
+    if (t <= RAY_EPSILON) return false;
+
     vec3 plane_point = ray.pos + ray.dir * t;
 
-    // intersection is behind point
-    if (t <= 0) return false;
-    // intersection outside of point
+    // check if intersection outside of point
 	float triangle_area = norm.mag();
 	float area_1 = cross(v2 - v3, plane_point - v3).mag() / triangle_area;
 	float area_2 = cross(v3 - v1, plane_point - v1).mag() / triangle_area;
@@ -321,8 +322,7 @@ void Reset() {
     lights.clear();
     ambient_lights.clear();
     materials.clear();
-	vertices.clear();
-    normals.clear();
+    load_state = LoadState{};
 
     strcpy(output_name, "raytraced.bmp");
 
@@ -339,7 +339,6 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
             continue;
 
         Ray to_light = light->ReverseLightRay(hit_info.pos);
-        to_light.pos = to_light.pos + hit_info.normal * 0.0001;
         HitInformation light_intersection;
         // If light is blocked
         if (FindIntersection(shapes, to_light, &light_intersection) &&
@@ -349,19 +348,22 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
         current = current + CalculateDiffuse(light, hit_info);
         current = current + CalculateSpecular(light, hit_info);
     }
-    Ray reflected = Ray::Reflect(hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
+    Ray reflected = Ray::Reflect(-hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
 	reflected.last_material = hit_info.material;
     current = current + hit_info.material->specular * EvaluateRay(reflected);
 
-	Material* last_mat = ray.last_material;
-	float last_ior = 1.0;
-	if (last_mat != NULL) last_ior = last_mat->ior;
-	Ray refracted = Ray::Refract(hit_info.viewing, hit_info.pos, hit_info.normal, last_ior, hit_info.material->ior, ray.bounces_left - 1);
-	if (refracted.bounces_left != -1)
-        current = current + hit_info.material->transmissive * EvaluateRay(refracted);
+    float next_ior = hit_info.material->ior;
+    Color t = hit_info.material->transmissive;
+    if (t.r + t.g + t.b > 0) {
+        Ray refracted = Ray::Refract(hit_info.viewing, hit_info.pos, hit_info.normal, next_ior, ray.bounces_left - 1);
+        refracted.last_material = hit_info.material;
+        if (refracted.bounces_left != -1)
+            current = current + hit_info.material->transmissive * EvaluateRay(refracted);
+    }
 
     current = current + CalculateAmbient(hit_info);
 
+    IM_ASSERT(!isnan(current.r) && !isnan(current.g) && !isnan(current.b));
     return current;
 }
 
@@ -406,11 +408,11 @@ Color CalculateAmbient(HitInformation hit) {
 }
 
 void Render() {
-    float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
-
     camera->PreRender();
     for (Geometry* geo : shapes) geo->PreRender();
     for (Light* light : lights) light->PreRender();
+    
+    float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
 
     for (Light* light : lights) {
         light->UpdateMult();
@@ -441,7 +443,7 @@ void Render() {
             float u = camera->mid_res[X] - x + offset.x;
             float v = camera->mid_res[Y] - y + offset.y;
 
-            vec3 rayDir = (-d * camera->forward + u * camera->right + v * camera->up).normalized();
+            vec3 rayDir = (d * camera->forward + u * camera->right + v * camera->up).normalized();
 
             Ray ray = Ray(camera->position, rayDir, camera->max_depth);
             Color new_color = EvaluateRay(ray);
@@ -508,13 +510,6 @@ bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* inter
         }
     }
     return dist != -1.0;
-}
-
-void DisplayImage(string name) {
-    int im_x, im_y;
-    bool ret = LoadTextureFromFile(name.c_str(), &disp_img_tex, &im_x, &im_y);
-    disp_img_size = ImVec2(im_x, im_y);
-    IM_ASSERT(ret);
 }
 
 }  //  namespace P3
@@ -672,6 +667,11 @@ int main(int argc, char** argv) {
         }
         ImGui::PopStyleColor();
 
+        DisplayLog();
+
+        ImGui::End();
+
+
         if (render_call.valid()) {
             render_call.get();  // Calling get makes the render_call invalid, storing that we used it.
             string relative_output_name = "output/" + string(output_name);
@@ -685,7 +685,6 @@ int main(int argc, char** argv) {
             ImGui::End();
         }
 
-        ImGui::End();
 
         // Rendering
         ImGui::Render();

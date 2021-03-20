@@ -25,7 +25,6 @@
     <ClCompile Include="src\lib\imgui\backends\imgui_impl_opengl3.cpp" />
     <ClCompile Include="src\lib\imgui\backends\imgui_impl_sdl.cpp" />
     <ClCompile Include="src\lib\imgui\imgui.cpp" />
-    <ClCompile Include="src\lib\imgui\imgui_demo.cpp" />
     <ClCompile Include="src\lib\imgui\imgui_draw.cpp" />
     <ClCompile Include="src\lib\imgui\imgui_tables.cpp" />
     <ClCompile Include="src\lib\imgui\imgui_widgets.cpp" />
