@@ -17,6 +17,7 @@
 #include <vector>
 #include <chrono>
 #include "ImGuizmo.h"
+#include "raytracer_imgui_extra.h"
 
 using std::array;
 using std::cout;
@@ -33,10 +34,10 @@ using namespace std::chrono;
 #define AA_NONE 0
 #define AA_FIVE -1
 #define SAMPLING AA_NONE // any SAMPLING > 0 is randomly sampled.
-#define RENDER_DELAY 0.01
+#define RENDER_DELAY 0.0
 
 // Constants
-#define RAY_EPSILON 0.001
+#define RAY_EPSILON 0.01
 #define H_SPACING 4
 #define CHARARRAY_LEN
 
@@ -328,6 +329,7 @@ Color CalculateAmbient(HitInformation hit);
 
 void Reset();
 void Load();
+void UpdateCameraWidget();
 void Save();
 void Render();
 void RenderOne();

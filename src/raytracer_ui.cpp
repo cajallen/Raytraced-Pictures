@@ -23,9 +23,28 @@ void Camera::PreRender() {
 	up = cross(right, forward).normalized();
 }
 
+// assumes normalized
+void ForwardUpToMatrix(float* mat, vec3& forward, vec3& up) {
+    vec3 right = cross(forward, up);
+    for (int i = 0; i < 3; i++) {
+        mat[0 + (i * 4)] = right[i];
+        mat[1 + (i * 4)] = up[i];
+        mat[2 + (i * 4)] = forward[i];
+        mat[3 + (i * 4)] = 0; // right row
+        mat[12 + i] = 0; // bottom row
+    }
+    mat[15] = 1;
+}
+
+void UpdateCameraWidget() {
+    ForwardUpToMatrix(cameraView, camera->forward, camera->up);
+};
+
 void MatrixToForwardUp(float* mat, vec3& forward, vec3& up) {
-    forward = vec3(mat[2], mat[6], mat[10]).normalized();
-    up = vec3(mat[1], mat[5], mat[9]).normalized();
+	for (int i = 0; i < 3; i++) {
+        up[i] = mat[1+(i*4)];
+        forward[i] = mat[2+(i*4)];
+	}
 }
 
 void Camera::ImGui() {
@@ -38,10 +57,10 @@ void Camera::ImGui() {
         float viewManipulateTop = ImGui::GetWindowPos().y + ImGui::GetItemRectMax().y - ImGui::GetWindowPos().y;
         updated |= ImGuizmo::ViewManipulate(cameraView, cameraDistance, ImVec2(viewManipulateRight - 128, viewManipulateTop), ImVec2(128, 128), 0x10101010);
         MatrixToForwardUp(cameraView, forward, up);
-        ImGui::DragFloat3("camera_forward", &forward.x, 0.0, 0.0, 0.0, "%.1f", ImGuiSliderFlags_NoInput);
-        ImGui::DragFloat3("camera_up", &up.x, 0.0, 0.0, 0.0, "%.1f", ImGuiSliderFlags_NoInput);
+        ImGui::DragDoubleN("camera_forward", &forward.x, 3, 0.0, 0.0, 0.0, "%.2f", ImGuiSliderFlags_NoInput);
+        ImGui::DragDoubleN("camera_up", &up.x, 3, 0.0, 0.0, 0.0, "%.2f", ImGuiSliderFlags_NoInput);
 
-        updated |= ImGui::DragFloat3("Camera Pos", &position.x, 0.1);
+        updated |= ImGui::DragDoubleN("Camera Pos", &position.x, 3);
         updated |= ImGui::SliderFloat("FOV", &half_vfov, 0.0, 180.0);
         updated |= ImGui::DragInt2("Resolution", &res[0], 1);
         updated |= ImGui::SliderInt("Max Depth", &max_depth, 1, 8);
@@ -72,7 +91,7 @@ void Sphere::ImGui() {
 	bool updated = false;
     ImGui::Indent(TAB_SIZE);
     if (ImGui::CollapsingHeader(WithId("Sphere ").c_str())) {
-        updated |= ImGui::DragFloat3(WithId("pos##").c_str(), &position.x, 0.02);
+        updated |= ImGui::DragDoubleN(WithId("pos##").c_str(), &position.x, 3);
         updated |= ImGui::DragFloat(WithId("radius##").c_str(), &radius, 0.01, 0.01);
         ImGui::Indent(3.0);
         material->ImGui();
@@ -89,9 +108,9 @@ void Triangle::ImGui() {
 	bool updated = false;
 	ImGui::Indent(TAB_SIZE);
 	if (ImGui::CollapsingHeader(WithId("Triangle ").c_str())) {
-		updated |= ImGui::DragFloat3(WithId("pos1##").c_str(), &v1.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("pos2##").c_str(), &v2.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("pos3##").c_str(), &v3.x, 0.02);
+		updated |= ImGui::DragDoubleN(WithId("pos1##").c_str(), &v1.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("pos2##").c_str(), &v2.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("pos3##").c_str(), &v3.x, 3, 0.05);
         ImGui::Indent(3.0);
         material->ImGui();
         ImGui::Unindent(3.0);
@@ -107,12 +126,12 @@ void NormalTriangle::ImGui() {
 	bool updated = false;
 	ImGui::Indent(TAB_SIZE);
 	if (ImGui::CollapsingHeader(WithId("NormTriangle ").c_str())) {
-		updated |= ImGui::DragFloat3(WithId("pos1##").c_str(), &v1.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("pos2##").c_str(), &v2.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("pos3##").c_str(), &v3.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("norm1##").c_str(), &n1.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("norm2##").c_str(), &n2.x, 0.02);
-		updated |= ImGui::DragFloat3(WithId("norm3##").c_str(), &n3.x, 0.02);
+		updated |= ImGui::DragDoubleN(WithId("pos1##").c_str(), &v1.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("pos2##").c_str(), &v2.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("pos3##").c_str(), &v3.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("norm1##").c_str(), &n1.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("norm2##").c_str(), &n2.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(WithId("norm3##").c_str(), &n3.x, 3, 0.05);
         ImGui::Indent(3.0);
         material->ImGui();
         ImGui::Unindent(3.0);
@@ -167,7 +186,7 @@ void PointLight::ImGui() {
     bool updated = false;
     ImGui::Indent(TAB_SIZE);
     if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
-        updated |= ImGui::DragFloat3(WithId("position##").c_str(), &position.x, 0.1);
+        updated |= ImGui::DragDoubleN(WithId("position##").c_str(), &position.x, 3);
         updated |= ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01, 1000.0);
         updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
@@ -182,8 +201,8 @@ void SpotLight::ImGui() {
     bool updated = false;
     ImGui::Indent(TAB_SIZE);
     if (ImGui::CollapsingHeader(WithId("Spot ").c_str())) {
-        updated |= ImGui::DragFloat3(WithId("position##").c_str(), &position.x, 0.1);
-        updated |= ImGui::SliderFloat3(WithId("direction##").c_str(), &direction.x, -1, 1);
+        updated |= ImGui::DragDoubleN(WithId("position##").c_str(), &position.x, 3);
+        updated |= ImGui::DragDoubleN(WithId("direction##").c_str(), &direction.x, 3, 0.01, -1, 1);
         updated |= ImGui::SliderFloat(WithId("interior_angle##").c_str(), &angle1, 0, 90);
         angle2 = max(angle1, angle2);
         updated |= ImGui::SliderFloat(WithId("exterior_angle##").c_str(), &angle2, angle1, 90);
@@ -203,7 +222,7 @@ void DirectionalLight::ImGui() {
     ImGui::Indent(TAB_SIZE);
     if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
         updated |= ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
-        updated |= ImGui::DragFloat3(WithId("direction##").c_str(), &direction.x, 0.01, -1.0, 1.0);
+        updated |= ImGui::DragDoubleN(WithId("direction##").c_str(), &direction.x, 3, 0.05, -1.0, 1.0);
         updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
         if (ImGui::Button(WithId("Delete##").c_str())) {
             Delete();

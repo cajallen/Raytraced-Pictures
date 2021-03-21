@@ -40,19 +40,19 @@ struct std::hash<vec3i>{
 };
 
 struct vec3 {
-    float x, y, z;
+    double x, y, z;
 
-    vec3(float x, float y, float z) : x(x), y(y), z(z) {}
+    vec3(double x, double y, double z) : x(x), y(y), z(z) {}
     vec3() : x(0), y(0), z(0) {}
 
-    vec3 clamp(float min, float max) const { return vec3(fclamp(x, min, max), fclamp(y, min, max), fclamp(z, min, max)); }
+    vec3 clamp(double min, double max) const { return vec3(fclamp(x, min, max), fclamp(y, min, max), fclamp(z, min, max)); }
 
-    float mag() const { return sqrt(x * x + y * y + z * z); }
-    float mag2() const { return x * x + y * y + z * z; }
+    double mag() const { return sqrt(x * x + y * y + z * z); }
+    double mag2() const { return x * x + y * y + z * z; }
 
     // Create a unit-length vector
     vec3 normalized() const {
-        float len = mag();
+        double len = mag();
         return vec3(x / len, y / len, z / len);
     }
 
@@ -79,7 +79,7 @@ struct vec3 {
 		return prefix + to_string(x) + " " + to_string(y) + " " + to_string(z);
 	}
 
-	float& operator[](int index) {
+	double& operator[](int index) {
 		if (index == 0) return x;
 		if (index == 1) return y;
 		if (index == 2) return z;
@@ -88,16 +88,16 @@ struct vec3 {
 	}
 };
 
-inline vec3 operator*(vec3 a, float f) {
+inline vec3 operator*(vec3 a, double f) {
     return vec3(a.x * f, a.y * f, a.z * f);
 }
 
-inline vec3 operator*(float f, vec3 a) {
+inline vec3 operator*(double f, vec3 a) {
     return vec3(a.x * f, a.y * f, a.z * f);
 }
 
 // Vector-vector dot product
-inline float dot(vec3 a, vec3 b) {
+inline double dot(vec3 a, vec3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 

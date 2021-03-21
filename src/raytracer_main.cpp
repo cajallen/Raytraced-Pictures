@@ -141,10 +141,10 @@ bool Triangle::FindIntersection(Ray ray, HitInformation* intersection) {
     vec3 edge1 = v2 - v1;
     vec3 edge2 = v3 - v1;
 
-    vec3 norm = cross(edge1, edge2);
-    float d = (dot(ray.dir, norm));
-    if (d == 0) return false; // Parallel
-    float t = -(dot(ray.pos, norm) + -dot(norm, v1)) / d;
+    vec3 norm = cross(edge1, edge2).normalized();
+    double dvn = dot(ray.dir, norm);
+    if (dvn == 0) return false; // Parallel
+    double t = -(dot(ray.pos, norm) + -dot(norm, v1)) / dvn;
     vec3 plane_point = ray.pos + ray.dir * t;
 
 	// intersection is behind point
@@ -160,7 +160,7 @@ bool Triangle::FindIntersection(Ray ray, HitInformation* intersection) {
 	intersection->dist = t;
 	intersection->material = material;
     intersection->viewing = ray.dir;
-	intersection->normal = d < 0 ? norm : -norm;
+	intersection->normal = dvn < 0 ? norm : -norm;
 	return true;
 }
 
@@ -334,6 +334,8 @@ void Reset() {
 Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
 
+    Log("Calculating lighting for a hit");
+
     for (Light* light : lights) {
         if (light->Intensity(hit_info.pos) < Color(0.001, 0.001, 0.001))
             continue;
@@ -345,12 +347,26 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
             light_intersection.dist < sqrt(light->DistanceTo2(hit_info.pos)))
             continue;
 
-        current = current + CalculateDiffuse(light, hit_info);
-        current = current + CalculateSpecular(light, hit_info);
+        Color diffuse = CalculateDiffuse(light, hit_info);
+        ostringstream os0;
+        os0 << "Adding " << diffuse << " from diffuse";
+        Log(os0.str());
+        current = current + diffuse;
+
+        Color specular = CalculateSpecular(light, hit_info);
+        ostringstream os1;
+        os1 << "Adding " << specular << " from specular";
+        Log(os1.str());
+        current = current + specular;
     }
     Ray reflected = Ray::Reflect(-hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
 	reflected.last_material = hit_info.material;
-    current = current + hit_info.material->specular * EvaluateRay(reflected);
+    Color refl_col =  hit_info.material->specular * EvaluateRay(reflected);
+    ostringstream os2;
+    os2 << "Adding " << refl_col << " from specular";
+    Log(os2.str());
+    current = current + refl_col;
+
 
     float next_ior = hit_info.material->ior;
     Color t = hit_info.material->transmissive;
@@ -363,6 +379,9 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
 
     current = current + CalculateAmbient(hit_info);
 
+    ostringstream os3;
+    os3 << "Returning " << current;
+    Log(os3.str());
     IM_ASSERT(!isnan(current.r) && !isnan(current.g) && !isnan(current.b));
     return current;
 }
@@ -581,6 +600,28 @@ int main(int argc, char** argv) {
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window))
                 done = true;
+            if (event.type == SDL_KEYDOWN) {
+                char key = event.key.keysym.sym;
+                if (key == SDLK_SPACE) {
+                    camera->position += camera->up * 0.1;
+                }
+                if (key == SDLK_x) {
+                    camera->position -= camera->up * 0.1;
+                }
+                if (key == SDLK_w) {
+                    camera->position += camera->forward * 0.1;
+                }
+                if (key == SDLK_s) {
+                    camera->position -= camera->forward * 0.1;
+                }
+                if (key == SDLK_a) {
+                    camera->position += camera->right * 0.1;
+                }
+                if (key == SDLK_d) {
+                    camera->position -= camera->right * 0.1;
+                }
+                RequestRender();
+            }
         }
 
         // Start the Dear ImGui frame

@@ -325,6 +325,7 @@ void Load() {
     }
     scene_file.close();
 
+    UpdateCameraWidget();
 	RequestRender();
 }
 

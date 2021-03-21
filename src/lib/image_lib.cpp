@@ -125,3 +125,7 @@ void Image::write(const char* fname) {
 Image::~Image() {
     delete[] pixels;
 }
+
+ostream& operator<<(ostream& os, const Color& col) {
+    return os << "{" << col.r << "r, " << col.g << "g, " << col.b << "b}";
+}

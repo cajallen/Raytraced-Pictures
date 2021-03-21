@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stb_image.h>
 #include "stb_image_write.h"
+#include <iostream>
 
 #define LERP(a, b, r) ((1.0 - r) * a + r * b)
 
@@ -47,5 +48,7 @@ struct Image {
 
     Image& operator=(const Image& rhs);
 };
+   
+ostream& operator<<(ostream& os, const Color& col);
 
 #endif
