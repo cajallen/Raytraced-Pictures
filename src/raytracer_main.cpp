@@ -334,8 +334,6 @@ void Reset() {
 Color ApplyLighting(Ray ray, HitInformation hit_info) {
     Color current(0, 0, 0);
 
-    Log("Calculating lighting for a hit");
-
     for (Light* light : lights) {
         if (light->Intensity(hit_info.pos) < Color(0.001, 0.001, 0.001))
             continue;
@@ -348,23 +346,14 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
             continue;
 
         Color diffuse = CalculateDiffuse(light, hit_info);
-        ostringstream os0;
-        os0 << "Adding " << diffuse << " from diffuse";
-        Log(os0.str());
         current = current + diffuse;
 
         Color specular = CalculateSpecular(light, hit_info);
-        ostringstream os1;
-        os1 << "Adding " << specular << " from specular";
-        Log(os1.str());
         current = current + specular;
     }
     Ray reflected = Ray::Reflect(-hit_info.viewing, hit_info.pos, hit_info.normal, ray.bounces_left - 1);
 	reflected.last_material = hit_info.material;
     Color refl_col =  hit_info.material->specular * EvaluateRay(reflected);
-    ostringstream os2;
-    os2 << "Adding " << refl_col << " from specular";
-    Log(os2.str());
     current = current + refl_col;
 
 
@@ -378,10 +367,6 @@ Color ApplyLighting(Ray ray, HitInformation hit_info) {
     }
 
     current = current + CalculateAmbient(hit_info);
-
-    ostringstream os3;
-    os3 << "Returning " << current;
-    Log(os3.str());
     IM_ASSERT(!isnan(current.r) && !isnan(current.g) && !isnan(current.b));
     return current;
 }
@@ -442,10 +427,9 @@ void Render() {
     }
 
     Image outputImg = Image(camera->res[X], camera->res[Y]);
-#ifndef _DEBUG
-#pragma omp parallel for num_threads((int) (omp_get_thread_limit() * 0.75)) schedule(dynamic, camera->res[X])
-#endif
+#pragma omp parallel for num_threads(2) schedule(dynamic, camera->res[X])
     for (int i = 0; i < camera->res[X] * camera->res[Y]; i++) {
+        if (i == 0) Log(to_string(omp_get_num_threads()));
         int x = i % camera->res[X];
         int y = i / camera->res[X];
         vector<ImVec2> offsets;
@@ -500,7 +484,7 @@ void RenderOne() {
     float u = camera->mid_res[X];
     float v = camera->mid_res[Y];
 
-    vec3 rayDir = (-camera->forward).normalized();
+    vec3 rayDir = camera->forward.normalized();
 
     Ray ray = Ray(camera->position, rayDir, camera->max_depth);
     Color new_color = EvaluateRay(ray);

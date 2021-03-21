@@ -1,0 +1,25 @@
+
+camera_pos: 0.918394 0.489575 -0.302195
+camera_fwd: -0.277374 -0.14685 0.949473
+camera_up: -0.0411787 0.989159 0.140958
+camera_fov_ha: 45
+film_resolution: 640 480
+output_image: recursion_test.png
+background: 0.0588235 0 0.0588235
+max_depth: 5
+
+
+material: 0.5 0.5 0.5 0.5 0.5 0.5 0.584314 0 0 8 0 0 0 1
+
+vertex: 0.000000 1.000000 0.000000
+vertex: 1.000000 0.000000 0.000000
+vertex: 0.000000 0.000000 0.000000
+triangle: 0 1 2
+
+material: 0.5 0.5 0.5 0.5 0.5 0.5 1 1 1 8 0 0 0 1
+
+vertex: 0.000000 1.000000 0.200000
+vertex: 1.000000 0.000000 0.200000
+vertex: 0.000000 0.000000 0.200000
+triangle: 3 4 5
+point_light: 20 20 20 0 2 0.1

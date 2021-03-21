@@ -8,6 +8,7 @@
 #include <image_lib.h>
 #include <io.h>
 #include <vec3.h>
+#include <omp.h>
 #include <array>
 #include <fstream>
 #include <future>
