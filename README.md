@@ -24,7 +24,8 @@ Video includes (with timestamps)...
 ![shadows](https://github.com/cajallen/Raytracer/blob/main/output/multi_light_demo.png)  
 
 #### Bounded Recursion
-![bounded recursion](https://github.com/cajallen/Raytracer/blob/main/output/recursion_test.png.png)
+![bounded recursion](https://github.com/cajallen/Raytracer/blob/main/output/recursion_test.png)  
+Two triangles, facing each other with a light inbetween. They are both purely specular, the one that we are looking at is perfectly reflective, where as the one we are looking at the back of has half of a red component. We can see the reflection get more red as it reflects, then stop.
 
 #### Jittered Sampling  
 ![sampling](https://github.com/cajallen/Raytracer/blob/main/output/SamplingDemo.png) 
