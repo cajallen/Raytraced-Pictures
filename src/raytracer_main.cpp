@@ -5,17 +5,17 @@ inline float randf() {
     return rand() / (float)RAND_MAX;
 }
 
-namespace P3 {
+namespace Raytracer {
 
 // UI STATE
-vector<Geometry*> shapes{};
-vector<Light*> lights{};
-vector<AmbientLight*> ambient_lights{};
-vector<Material*> materials{new Material()};
-Camera* camera = new Camera();
 int entity_count = 0;
 char scene_name[256] = "";
 char output_name[256] = "raytraced.bmp";
+vector<Material*> materials{new Material(&entity_count)};
+Camera* camera = new Camera(&entity_count);
+vector<Geometry*> shapes{};
+vector<Light*> lights{};
+vector<AmbientLight*> ambient_lights{};
 steady_clock::time_point last_request;
 bool update_automatically = false;
 vector<string> debug_log{};
@@ -23,289 +23,33 @@ vector<string> debug_log{};
 ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
 
-Ray Ray::Reflect(vec3 dir_in, vec3 origin, vec3 dir_mirror, int bounces_left) {
 
-    vec3 midpoint = dir_mirror * dot(dir_in, dir_mirror);
-    vec3 out_dir = (2 * midpoint - dir_in).normalized();
-    return Ray(origin, out_dir, bounces_left);
-}
-
-Ray Ray::Refract(vec3 dir_in, vec3 origin, vec3 norm, float iornew, int bounces_left) {
-    float ratio = iornew;
-    float dotValue = dot(dir_in, norm);
-    // in direction opposite with normal, we're entering
-    if (dotValue < 0) {
-        ratio = (1 / iornew);
-    }
-    // in direction is aligned with normal; we're leaving
-    else {
-        dotValue = -dotValue;
-    }
-    float k = 1 - pow(ratio, 2) * (1 - pow(dotValue, 2));
-    if (k < 0)
-        return Ray(vec3(), vec3(), -1);
-    else {
-        vec3 dir_out = ratio * dir_in - (ratio * dotValue + sqrt(k)) * norm;
-        dir_out = dir_out.normalized();
-        return Ray(origin, dir_out, bounces_left);
-    }
-}
-
-// Call without index to create new shapes
-Object::Object() {
-    id = entity_count;
-    entity_count++;
-}
-
-// Call with index to replace shapes (use old id)
-Object::Object(int old_id) {
-    id = old_id;
-}
-
-Geometry::Geometry() : Object() {
-    material = materials.back();
-}
-Geometry::Geometry(int old_id) : Object(old_id) {
-    material = materials.back();
-}
-
-vector<Geometry*>::iterator Geometry::GetIter() {
+vector<Geometry*>::iterator GetIter(Geometry* geo) {
     for (vector<Geometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
-        if ((*it)->id == id) {
+        if ((*it)->id == geo->id) {
             return it;
         }
     }
-    cout << "Geometry not found in shapes" << endl;
     return shapes.end();
 }
-vector<Light*>::iterator Light::GetIter() {
+
+vector<Light*>::iterator GetIter(Light* light) {
     for (vector<Light*>::iterator it = lights.begin(); it < lights.end(); it++) {
-        if ((*it)->id == id) {
+        if ((*it)->id == light->id) {
             return it;
         }
     }
-    cout << "Light not found in lights" << endl;
     return lights.end();
 }
 
-void Geometry::Delete() {
-    shapes.erase(GetIter());
-}
-void Light::Delete() {
-    lights.erase(GetIter());
+void Delete(Geometry* geo) {
+	shapes.erase(GetIter(geo));
 }
 
-void Light::UpdateMult() {
-    color = color * mult;
-    mult = 1;
+void Delete(Light* light) {
+	lights.erase(GetIter(light));
 }
 
-void Light::ClampColor() {
-    if (color.r > 1 || color.g > 1 || color.b > 1) {
-        float max_col = max(color.r, max(color.g, color.b));
-        mult = max_col;
-        color.r /= mult;
-        color.g /= mult;
-        color.b /= mult;
-    }
-}
-
-bool Sphere::FindIntersection(Ray ray, HitInformation* intersection) {
-    vec3 toStart = (ray.pos - position);
-    float b = 2.0 * dot(ray.dir, toStart);
-    float c = dot(toStart, toStart) - pow(radius, 2);
-    float discr = pow(b, 2) - 4.0 * c;
-
-	// no solutions to quadratic equation
-    if (discr < 0)
-        return false;
-
-	// t is the distance to the solutions of the line sphere intersection
-    float t0 = (-b + sqrt(discr)) / 2.0;
-    float t1 = (-b - sqrt(discr)) / 2.0;
-    float t_min = (RAY_EPSILON < t1 && t1 < t0) ? t1 : t0;
-
-    if (t_min < RAY_EPSILON)
-        return false;
-
-    vec3 hit_pos = ray.pos + t_min * ray.dir;
-    vec3 hit_norm = (hit_pos - position).normalized();
-    *intersection = HitInformation{t_min, hit_pos, ray.dir, hit_norm, material};
-
-    return true;
-}
-
-// OPTIMIZATION: 
-bool Triangle::FindIntersection(Ray ray, HitInformation* intersection) {
-	// Doesn't really matter how we do this. This gives us CCW winding.
-    vec3 edge1 = v2 - v1;
-    vec3 edge2 = v3 - v1;
-
-    vec3 norm = cross(edge1, edge2).normalized();
-    double dvn = dot(ray.dir, norm);
-    if (dvn == 0) return false; // Parallel
-    double t = -(dot(ray.pos, norm) + -dot(norm, v1)) / dvn;
-    vec3 plane_point = ray.pos + ray.dir * t;
-
-	// intersection is behind point
-	if (t <= RAY_EPSILON) return false;
-    // intersection outside of point
-    bool same_side_v1 = same_side(plane_point, v1, v2, v3);
-    bool same_side_v2 = same_side(plane_point, v2, v1, v3);
-    bool same_side_v3 = same_side(plane_point, v3, v1, v2);
-    if (!same_side_v1 || !same_side_v2 || !same_side_v3)
-        return false;
-
-	intersection->pos = plane_point;
-	intersection->dist = t;
-	intersection->material = material;
-    intersection->viewing = ray.dir;
-	intersection->normal = dvn < 0 ? norm : -norm;
-	return true;
-}
-
-// TODO: aint too happy that this doesn't reuse code. Finding the plane point is mutual.
-bool NormalTriangle::FindIntersection(Ray ray, HitInformation* intersection) {
-    vec3 edge1 = v2 - v1;
-    vec3 edge2 = v3 - v1;
-
-    vec3 norm = cross(edge1, edge2);
-    float d = (dot(ray.dir, norm));
-    if (d == 0) return false; // Parallel
-
-    float t = -(dot(ray.pos, norm) + -dot(norm, v1)) / d;
-    // intersection is behind point
-    if (t <= RAY_EPSILON) return false;
-
-    vec3 plane_point = ray.pos + ray.dir * t;
-
-    // check if intersection outside of point
-	float triangle_area = norm.mag();
-	float area_1 = cross(v2 - v3, plane_point - v3).mag() / triangle_area;
-	float area_2 = cross(v3 - v1, plane_point - v1).mag() / triangle_area;
-    float area_3 = cross(v1 - v2, plane_point - v2).mag() / triangle_area;
-	if (area_1 > 1 || area_2 > 1 || area_3 > 1 || (area_1+area_2+area_3) > (1 + 100*FLT_EPSILON)) return false;
-
-    intersection->pos = plane_point;
-    intersection->dist = t;
-    intersection->material = material;
-    intersection->viewing = ray.dir;
-	vec3 out_norm = n1*area_1 + n2*area_2 + n3*area_3;
-    intersection->normal = out_norm;
-    return true;
-}
-
-
-void NormalTriangle::PreRender() {
-	n1 = n1.normalized();
-	n2 = n2.normalized();
-	n3 = n3.normalized();
-}
-
-
-
-BoundingBox Sphere::GetBoundingBox() {
-    BoundingBox bb;
-    bb.min = position - vec3(radius, radius, radius);
-    bb.max = position + vec3(radius, radius, radius);
-    return bb;
-}
-
-BoundingBox Triangle::GetBoundingBox() {
-	BoundingBox bb{v1, v1};
-	for (int i = 0; i < 3; i++) {
-		bb.min[i] = fmin(bb.min[i], fmin(v2[i], v3[i]));
-		bb.max[i] = fmax(bb.max[i], fmax(v2[i], v3[i]));
-	}
-	return bb;
-}
-
-
-bool Sphere::OverlapsCube(vec3 pos, float hwidth) {
-    float d = 0;
-    for (int i = 0; i < 3; i++) {
-        float min = pos[i] - hwidth;
-        float max = pos[i] + hwidth;
-        if (position[i] < min) {
-            float axis_d = position[i] - min;
-            d += axis_d * axis_d;
-        } else if (position[i] > max) {
-            float axis_d = position[i] - max;
-            d += axis_d * axis_d;
-        }
-    }
-    return d < radius * radius;
-}
-
-// OPTIMIZATION: This is not correct.
-bool Triangle::OverlapsCube(vec3 pos, float hwidth) {
-	// This could be implemented, but it's written by a person who cannot code for their life.
-    // https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/code/tribox3.txt
-	BoundingBox bb = GetBoundingBox();
-	vec3 other_min = pos - vec3(hwidth, hwidth, hwidth);
-	vec3 other_max = pos + vec3(hwidth, hwidth, hwidth);
-	bool x_overlaps = (bb.max.x > other_min.x && bb.min.x < other_max.x);
-	bool y_overlaps = (bb.max.y > other_min.y && bb.min.y < other_max.y);
-	bool z_overlaps = (bb.max.z > other_min.z && bb.min.z < other_max.z);
-	return x_overlaps && y_overlaps && z_overlaps;
-}
-
-Ray DirectionalLight::ReverseLightRay(vec3 from) {
-    return Ray{from, -direction, -1};
-}
-
-Ray PointLight::ReverseLightRay(vec3 from) {
-    vec3 offset = position - from;
-
-    return Ray{from, offset.normalized(), -1};
-}
-
-Ray SpotLight::ReverseLightRay(vec3 from) {
-    vec3 offset = position - from;
-
-    return Ray{from, offset.normalized(), -1};
-}
-
-float DirectionalLight::DistanceTo2(vec3 to) {
-    return INFINITY;
-}
-
-float PointLight::DistanceTo2(vec3 to) {
-    vec3 offset = to - position;
-    return offset.mag2();
-}
-
-float SpotLight::DistanceTo2(vec3 to) {
-    vec3 offset = to - position;
-    return offset.mag2();
-}
-
-Color DirectionalLight::Intensity(vec3 to) {
-    return color;
-}
-
-Color PointLight::Intensity(vec3 to) {
-    float dist2 = DistanceTo2(to);
-    float r = color.r / dist2;
-    float g = color.g / dist2;
-    float b = color.b / dist2;
-
-    return Color(r, g, b);
-}
-
-Color SpotLight::Intensity(vec3 to) {
-    vec3 angle_to = (to - position).normalized();
-    float diff = 180.0 * acos(dot(angle_to, direction)) / M_PI;
-    float dist2 = DistanceTo2(to);
-
-    if (diff < angle1)
-        return color * (1 / dist2);
-    float amount = 1 - ((diff - angle1) / (angle2 - angle1));
-    if (diff < angle2)
-        return color * amount * (1 / dist2);
-
-    return Color(0, 0, 0);
-}
 
 void Reset() {
     delete camera;
@@ -327,8 +71,8 @@ void Reset() {
     strcpy(output_name, "raytraced.bmp");
 
     entity_count = 0;
-    materials.push_back(new Material());
-    camera = new Camera();
+    materials.push_back(new Material(&entity_count));
+    camera = new Camera(&entity_count);
 }
 
 Color ApplyLighting(Ray ray, HitInformation hit_info) {
@@ -411,13 +155,12 @@ Color CalculateAmbient(HitInformation hit) {
     return c;
 }
 
-void Render() {
+
+float PreRender() {
     camera->PreRender();
     for (Geometry* geo : shapes) geo->PreRender();
     for (Light* light : lights) light->PreRender();
     
-    float d = camera->mid_res[Y] / tanf(camera->half_vfov * (M_PI / 180.0f));
-
     for (Light* light : lights) {
         light->UpdateMult();
         AmbientLight* al = dynamic_cast<AmbientLight*>(light);
@@ -426,12 +169,26 @@ void Render() {
         }
     }
 
-    Image outputImg = Image(camera->res[X], camera->res[Y]);
-#pragma omp parallel for num_threads(2) schedule(dynamic, camera->res[X])
-    for (int i = 0; i < camera->res[X] * camera->res[Y]; i++) {
+    return camera->mid_res.y / tanf(camera->half_vfov * (M_PI / 180.0f));
+}
+
+void PostRender() {
+    ambient_lights.clear();
+
+    for (Light* light : lights) {
+        light->ClampColor();
+    }
+}
+
+void Render() {
+	float d = PreRender();
+    
+	Image outputImg = Image(camera->res.x, camera->res.y);
+#pragma omp parallel for num_threads(3) schedule(dynamic, camera->res.x)
+    for (int i = 0; i < camera->res.x * camera->res.y; i++) {
         if (i == 0) Log(to_string(omp_get_num_threads()));
-        int x = i % camera->res[X];
-        int y = i / camera->res[X];
+        int x = i % camera->res.x;
+        int y = i / camera->res.x;
         vector<ImVec2> offsets;
 #if SAMPLING == -1
         offsets = {ImVec2(0.50, 0.50), ImVec2(0.15, 0.15), ImVec2(0.85, 0.15), ImVec2(0.85, 0.85), ImVec2(0.15, 0.85)};
@@ -443,8 +200,8 @@ void Render() {
 #endif
         Color col = Color(0, 0, 0);
         for (ImVec2 offset : offsets) {
-            float u = camera->mid_res[X] - x + offset.x;
-            float v = camera->mid_res[Y] - y + offset.y;
+            float u = camera->mid_res.x - x + offset.x;
+            float v = camera->mid_res.y - y + offset.y;
 
             vec3 rayDir = (d * camera->forward + u * camera->right + v * camera->up).normalized();
 
@@ -456,11 +213,7 @@ void Render() {
         outputImg.setPixel(x, y, col);
     }
 
-    ambient_lights.clear();
-
-    for (Light* light : lights) {
-        light->ClampColor();
-    }
+	PostRender();
 
     // TODO: Instead of displaying image, write to a buffer.
     string relative_output_name = "output/" + string(output_name);
@@ -468,21 +221,11 @@ void Render() {
 }
 
 void RenderOne() {
-    camera->PreRender();
-    for (Geometry* geo : shapes) geo->PreRender();
-    for (Light* light : lights) light->PreRender();
-
-    for (Light* light : lights) {
-        light->UpdateMult();
-        AmbientLight* al = dynamic_cast<AmbientLight*>(light);
-        if (al != NULL) {
-            ambient_lights.push_back(al);
-        }
-    }
+    PreRender();
 
     Color col = Color(0, 0, 0);
-    float u = camera->mid_res[X];
-    float v = camera->mid_res[Y];
+    float u = camera->mid_res.x;
+    float v = camera->mid_res.y;
 
     vec3 rayDir = camera->forward.normalized();
 
@@ -490,11 +233,7 @@ void RenderOne() {
     Color new_color = EvaluateRay(ray);
     new_color.Clamp();
 
-    ambient_lights.clear();
-
-    for (Light* light : lights) {
-        light->ClampColor();
-    }
+    PostRender();
 }
 
 void RequestRender() {
@@ -515,9 +254,9 @@ bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* inter
     return dist != -1.0;
 }
 
-}  //  namespace P3
+}  //  namespace Raytracer
 
-using namespace P3;
+using namespace Raytracer;
 
 // TODO: move more code out of main.
 // TODO: Changing program state shouldn't happen during a render call.
@@ -571,10 +310,10 @@ int main(int argc, char** argv) {
 
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    future<void> render_call;
 
     // Main loop
     bool done = false;
-    future<void> render_call;
     while (!done) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -617,12 +356,12 @@ int main(int argc, char** argv) {
 
         duration<double> span = duration_cast<duration<double>>(steady_clock::now() - last_request);
         bool time_update = update_automatically && (last_request != steady_clock::time_point() && span.count() > RENDER_DELAY);
-        if (ImGui::Button("Render", ImVec2(ImGui::GetWindowWidth() *0.5, 0)) || time_update) {
+        if (ImGui::Button("Render", ImVec2(ImGui::GetWindowWidth() * 0.55, 0)) || time_update) {
             last_request = steady_clock::time_point();
             render_call = async(Render);
         }
         ImGui::SameLine();
-        if (ImGui::Button("RenderOne", ImVec2(ImGui::GetWindowWidth() * 0.25, 0))) {
+        if (ImGui::Button("RenderOne", ImVec2(ImGui::GetWindowWidth() * 0.20, 0))) {
             RenderOne();
         }
         ImGui::SameLine();
@@ -650,21 +389,21 @@ int main(int argc, char** argv) {
                 shape->ImGui();
             }
             if (ImGui::Button("New Sphere", ImVec2(ImGui::GetWindowWidth() / 3 - H_SPACING * 2, 0))) {
-                Material* mat = new Material();
+                Material* mat = new Material(&entity_count);
                 materials.push_back(mat);
-                shapes.push_back(new Sphere());
+                shapes.push_back(new Sphere(&entity_count, mat));
             }
 			ImGui::SameLine(0.0f, H_SPACING);
             if (ImGui::Button("New Triangle", ImVec2(ImGui::GetWindowWidth() / 3 - H_SPACING * 2, 0))) {
-                Material* mat = new Material();
+                Material* mat = new Material(&entity_count);
                 materials.push_back(mat);
-                shapes.push_back(new Triangle());
+                shapes.push_back(new Triangle(&entity_count, mat));
             }
 			ImGui::SameLine(0.0f, H_SPACING);
             if (ImGui::Button("New NormTriangle", ImVec2(ImGui::GetWindowWidth() / 3 - H_SPACING * 2, 0))) {
-                Material* mat = new Material();
+                Material* mat = new Material(&entity_count);
                 materials.push_back(mat);
-                shapes.push_back(new NormalTriangle());
+                shapes.push_back(new NormalTriangle(&entity_count, mat));
             }
         }
         ImGui::PopStyleColor();
@@ -675,19 +414,19 @@ int main(int argc, char** argv) {
                 light->ImGui();
             }
             if (ImGui::Button("New Ambient", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
-                lights.push_back(new AmbientLight());
+                lights.push_back(new AmbientLight(&entity_count));
             }
             ImGui::SameLine(0.0f, H_SPACING);
             if (ImGui::Button("New Point", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
-                lights.push_back(new PointLight());
+                lights.push_back(new PointLight(&entity_count));
             }
             ImGui::SameLine(0.0f, H_SPACING);
             if (ImGui::Button("New Spot", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
-                lights.push_back(new SpotLight());
+                lights.push_back(new SpotLight(&entity_count));
             }
             ImGui::SameLine(0.0f, H_SPACING);
             if (ImGui::Button("New Directional", ImVec2(ImGui::GetWindowWidth() / 4 - H_SPACING * 2, 0))) {
-                lights.push_back(new DirectionalLight());
+                lights.push_back(new DirectionalLight(&entity_count));
             }
         }
         ImGui::PopStyleColor();

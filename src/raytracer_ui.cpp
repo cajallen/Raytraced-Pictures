@@ -1,5 +1,6 @@
 #include "raytracer_main.h"
 
+
 #define UI_HSPACING 4
 #define TAB_SIZE 6.0
 
@@ -9,14 +10,13 @@ float cameraView[16] = { 1.f, 0.f, 0.f, 0.f,
                  0.f, 0.f, 0.f, 1.f };
 float cameraDistance = 8.0f;
 bool print_debug = false;
-namespace P3 {
 
-string Object::WithId(string s) {
-    return s + std::to_string(id);
-}
+namespace Raytracer {
+
+#define ImGuiStr(name) WithId(name).c_str()
 
 void Camera::PreRender() {
-	mid_res = { res[X] / 2, res[Y] / 2 };
+	mid_res = vec3i(res.x / 2, res.y / 2, 0);
 
 	forward = forward.normalized();
 	right = cross(forward, up).normalized();
@@ -62,7 +62,7 @@ void Camera::ImGui() {
 
         updated |= ImGui::DragDoubleN("Camera Pos", &position.x, 3);
         updated |= ImGui::SliderFloat("FOV", &half_vfov, 0.0, 180.0);
-        updated |= ImGui::DragInt2("Resolution", &res[0], 1);
+        updated |= ImGui::DragInt2("Resolution", &res.x, 1);
         updated |= ImGui::SliderInt("Max Depth", &max_depth, 1, 8);
         updated |= ImGui::ColorEdit3("Background Color", &background_color.r);
     }
@@ -73,15 +73,15 @@ void Camera::ImGui() {
 
 void Geometry::ImGui() {
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Geometry ").c_str())) {
-        if (ImGui::Button(WithId("Sphere").c_str())) {
-            auto iter = GetIter();
+    if (ImGui::CollapsingHeader(ImGuiStr("Geometry "))) {
+        if (ImGui::Button(ImGuiStr("Sphere"))) {
+            auto iter = GetIter(this);
             Geometry* old = *iter;
-            *iter = new Sphere(id);
+            *iter = new Sphere(id, materials.back());
             delete old;
         }
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
     }
     ImGui::Unindent(TAB_SIZE);
@@ -90,14 +90,14 @@ void Geometry::ImGui() {
 void Sphere::ImGui() {
 	bool updated = false;
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Sphere ").c_str())) {
-        updated |= ImGui::DragDoubleN(WithId("pos##").c_str(), &position.x, 3);
-        updated |= ImGui::DragFloat(WithId("radius##").c_str(), &radius, 0.01, 0.01);
+    if (ImGui::CollapsingHeader(ImGuiStr("Sphere "))) {
+        updated |= ImGui::DragDoubleN(ImGuiStr("pos##"), &position.x, 3);
+        updated |= ImGui::DragFloat(ImGuiStr("radius##"), &radius, 0.01, 0.01);
         ImGui::Indent(3.0);
         material->ImGui();
         ImGui::Unindent(3.0);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
     }
     ImGui::Unindent(TAB_SIZE);
@@ -107,15 +107,15 @@ void Sphere::ImGui() {
 void Triangle::ImGui() {
 	bool updated = false;
 	ImGui::Indent(TAB_SIZE);
-	if (ImGui::CollapsingHeader(WithId("Triangle ").c_str())) {
-		updated |= ImGui::DragDoubleN(WithId("pos1##").c_str(), &v1.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("pos2##").c_str(), &v2.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("pos3##").c_str(), &v3.x, 3, 0.05);
+	if (ImGui::CollapsingHeader(ImGuiStr("Triangle "))) {
+		updated |= ImGui::DragDoubleN(ImGuiStr("pos1##"), &v1.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("pos2##"), &v2.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("pos3##"), &v3.x, 3, 0.05);
         ImGui::Indent(3.0);
         material->ImGui();
         ImGui::Unindent(3.0);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
 	}
 	ImGui::Unindent(TAB_SIZE);
@@ -125,18 +125,18 @@ void Triangle::ImGui() {
 void NormalTriangle::ImGui() {
 	bool updated = false;
 	ImGui::Indent(TAB_SIZE);
-	if (ImGui::CollapsingHeader(WithId("NormTriangle ").c_str())) {
-		updated |= ImGui::DragDoubleN(WithId("pos1##").c_str(), &v1.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("pos2##").c_str(), &v2.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("pos3##").c_str(), &v3.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("norm1##").c_str(), &n1.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("norm2##").c_str(), &n2.x, 3, 0.05);
-		updated |= ImGui::DragDoubleN(WithId("norm3##").c_str(), &n3.x, 3, 0.05);
+	if (ImGui::CollapsingHeader(ImGuiStr("NormTriangle "))) {
+		updated |= ImGui::DragDoubleN(ImGuiStr("pos1##"), &v1.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("pos2##"), &v2.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("pos3##"), &v3.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("norm1##"), &n1.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("norm2##"), &n2.x, 3, 0.05);
+		updated |= ImGui::DragDoubleN(ImGuiStr("norm3##"), &n3.x, 3, 0.05);
         ImGui::Indent(3.0);
         material->ImGui();
         ImGui::Unindent(3.0);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
 	}
 	ImGui::Unindent(TAB_SIZE);
@@ -145,14 +145,14 @@ void NormalTriangle::ImGui() {
 
 void Material::ImGui() {
 	bool updated = false;
-    if (ImGui::CollapsingHeader(WithId("Material ").c_str())) {
+    if (ImGui::CollapsingHeader(ImGuiStr("Material "))) {
         ImGui::Indent(4.0);
-        updated |= ImGui::ColorEdit3(WithId("ambient##").c_str(), &ambient.r);
-        updated |= ImGui::ColorEdit3(WithId("diffuse##").c_str(), &diffuse.r);
-        updated |= ImGui::ColorEdit3(WithId("specular##").c_str(), &specular.r);
-        updated |= ImGui::ColorEdit3(WithId("transmissive##").c_str(), &transmissive.r);
-        updated |= ImGui::DragFloat(WithId("phong##").c_str(), &phong, 1, 2.0, 128.0, "%.1f", ImGuiSliderFlags_Logarithmic);
-        updated |= ImGui::DragFloat(WithId("ior##").c_str(), &ior, 0.1f);
+        updated |= ImGui::ColorEdit3(ImGuiStr("ambient##"), &ambient.r);
+        updated |= ImGui::ColorEdit3(ImGuiStr("diffuse##"), &diffuse.r);
+        updated |= ImGui::ColorEdit3(ImGuiStr("specular##"), &specular.r);
+        updated |= ImGui::ColorEdit3(ImGuiStr("transmissive##"), &transmissive.r);
+        updated |= ImGui::DragFloat(ImGuiStr("phong##"), &phong, 1, 2.0, 128.0, "%.1f", ImGuiSliderFlags_Logarithmic);
+        updated |= ImGui::DragFloat(ImGuiStr("ior##"), &ior, 0.1f);
         ImGui::Unindent(4.0);
     }
 	if (updated) RequestRender();
@@ -160,9 +160,9 @@ void Material::ImGui() {
 
 void Light::ImGui() {
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Light ").c_str())) {
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+    if (ImGui::CollapsingHeader(ImGuiStr("Light "))) {
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
     }
     ImGui::Unindent(TAB_SIZE);
@@ -171,11 +171,11 @@ void Light::ImGui() {
 void AmbientLight::ImGui() {
     bool updated = false;
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Ambient ").c_str())) {
-        updated |= ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.05);
-        updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+    if (ImGui::CollapsingHeader(ImGuiStr("Ambient "))) {
+        updated |= ImGui::DragFloat(ImGuiStr("Multiplier##"), &mult, 0.05, 0.05);
+        updated |= ImGui::ColorEdit3(ImGuiStr("color##"), &color.r);
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
     }
     ImGui::Unindent(TAB_SIZE);
@@ -185,12 +185,12 @@ void AmbientLight::ImGui() {
 void PointLight::ImGui() {
     bool updated = false;
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Point ").c_str())) {
-        updated |= ImGui::DragDoubleN(WithId("position##").c_str(), &position.x, 3);
-        updated |= ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01, 1000.0);
-        updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+    if (ImGui::CollapsingHeader(ImGuiStr("Point "))) {
+        updated |= ImGui::DragDoubleN(ImGuiStr("position##"), &position.x, 3);
+        updated |= ImGui::DragFloat(ImGuiStr("Multiplier##"), &mult, 0.05, 0.01, 1000.0);
+        updated |= ImGui::ColorEdit3(ImGuiStr("color##"), &color.r);
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
     }
     ImGui::Unindent(TAB_SIZE);
@@ -200,16 +200,16 @@ void PointLight::ImGui() {
 void SpotLight::ImGui() {
     bool updated = false;
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Spot ").c_str())) {
-        updated |= ImGui::DragDoubleN(WithId("position##").c_str(), &position.x, 3);
-        updated |= ImGui::DragDoubleN(WithId("direction##").c_str(), &direction.x, 3, 0.01, -1, 1);
-        updated |= ImGui::SliderFloat(WithId("interior_angle##").c_str(), &angle1, 0, 90);
+    if (ImGui::CollapsingHeader(ImGuiStr("Spot "))) {
+        updated |= ImGui::DragDoubleN(ImGuiStr("position##"), &position.x, 3);
+        updated |= ImGui::DragDoubleN(ImGuiStr("direction##"), &direction.x, 3, 0.01, -1, 1);
+        updated |= ImGui::SliderFloat(ImGuiStr("interior_angle##"), &angle1, 0, 90);
         angle2 = max(angle1, angle2);
-        updated |= ImGui::SliderFloat(WithId("exterior_angle##").c_str(), &angle2, angle1, 90);
-        updated |= ImGui::DragFloat(WithId("Multiplier##").c_str(), &mult, 0.05, 0.01);
-        updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+        updated |= ImGui::SliderFloat(ImGuiStr("exterior_angle##"), &angle2, angle1, 90);
+        updated |= ImGui::DragFloat(ImGuiStr("Multiplier##"), &mult, 0.05, 0.01);
+        updated |= ImGui::ColorEdit3(ImGuiStr("color##"), &color.r);
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
         direction = direction.normalized();
     }
@@ -220,12 +220,12 @@ void SpotLight::ImGui() {
 void DirectionalLight::ImGui() {
     bool updated = false;
     ImGui::Indent(TAB_SIZE);
-    if (ImGui::CollapsingHeader(WithId("Directional ").c_str())) {
-        updated |= ImGui::DragFloat(WithId("Multiplier").c_str(), &mult, 0.05, 0.01);
-        updated |= ImGui::DragDoubleN(WithId("direction##").c_str(), &direction.x, 3, 0.05, -1.0, 1.0);
-        updated |= ImGui::ColorEdit3(WithId("color##").c_str(), &color.r);
-        if (ImGui::Button(WithId("Delete##").c_str())) {
-            Delete();
+    if (ImGui::CollapsingHeader(ImGuiStr("Directional "))) {
+        updated |= ImGui::DragFloat(ImGuiStr("Multiplier"), &mult, 0.05, 0.01);
+        updated |= ImGui::DragDoubleN(ImGuiStr("direction##"), &direction.x, 3, 0.05, -1.0, 1.0);
+        updated |= ImGui::ColorEdit3(ImGuiStr("color##"), &color.r);
+        if (ImGui::Button(ImGuiStr("Delete##"))) {
+            Delete(this);
         }
         direction = direction.normalized();
     }
@@ -298,4 +298,4 @@ void DisplayLog() {
 }
 
 
-}  // namespace P3
+}  // namespace Raytracer

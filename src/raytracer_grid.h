@@ -6,9 +6,9 @@
 #include <vec3.h>
 #include <math.h>
 
-#include "raytracer_main.h"
+#include "raytracer_geometry.h"
 
-namespace P3 {
+namespace Raytracer {
 
 struct Geometry;
 
@@ -43,6 +43,6 @@ struct Grid {
 	bool GetNext(vector<Geometry*>& out);
 };
 
-}  // namespace P3
+}  // namespace Raytracer
 
 #endif

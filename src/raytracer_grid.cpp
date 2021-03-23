@@ -4,7 +4,7 @@
 #include "raytracer_grid.h"
 
 
-namespace P3 { 
+namespace Raytracer { 
 
 // TODO: If there is an intersection, check to make sure it's in the current voxel.
 // Otherwise, check non-mailboxed shapes in the next voxel. Stop when our marked intersection
@@ -46,7 +46,7 @@ void Grid::MoveGeometry(Geometry* geo) {
 void Grid::InitializeIter(vec3 p, vec3 d) {
 	pos = p;
 	dir = d;
-
+	// TODO: min(dir) should be 1, not 0.7-1
 	dir_sign.x = d.x < 0 ? -1 : 1;
 	dir_sign.y = d.y < 0 ? -1 : 1;
 	dir_sign.z = d.z < 0 ? -1 : 1;
@@ -77,4 +77,4 @@ bool Grid::GetNext(vector<Geometry*>& out) {
 	return true;
 }
 
-}  // namespace P3
+}  // namespace Raytracer

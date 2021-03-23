@@ -28,11 +28,17 @@
     <ClCompile Include="src\lib\imgui\imgui_draw.cpp" />
     <ClCompile Include="src\lib\imgui\imgui_tables.cpp" />
     <ClCompile Include="src\lib\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\raytracer_geometry.cpp" />
     <ClCompile Include="src\raytracer_io.cpp" />
+    <ClCompile Include="src\raytracer_light.cpp" />
     <ClCompile Include="src\raytracer_main.cpp" />
+    <ClCompile Include="src\raytracer_object.cpp" />
+    <ClCompile Include="src\raytracer_ray.cpp" />
     <ClCompile Include="src\raytracer_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\ossstream.h" />
+    <ClInclude Include="src\raytracer_geometry.h" />
     <ClInclude Include="src\raytracer_imgui_extra.h" />
     <ClInclude Include="src\lib\glad\glad.h" />
     <ClInclude Include="src\lib\glad\khrplatform.h" />
@@ -135,7 +141,10 @@
     <ClInclude Include="src\lib\stb\stb_image.h" />
     <ClInclude Include="src\lib\stb\stb_image_write.h" />
     <ClInclude Include="src\lib\vec3.h" />
+    <ClInclude Include="src\raytracer_light.h" />
     <ClInclude Include="src\raytracer_main.h" />
+    <ClInclude Include="src\raytracer_object.h" />
+    <ClInclude Include="src\raytracer_ray.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -1,6 +1,6 @@
 #include "raytracer_main.h"
 
-namespace P3 {
+namespace Raytracer {
 
 LoadState load_state{};
 
@@ -44,7 +44,7 @@ void Camera::Decode(string& s) {
     rest = rest_if_prefix("film_resolution: ", s);
     if (rest != "") {
         stringstream ss(rest);
-        ss >> res[0] >> res[1];
+        ss >> res.x >> res.y;
     }
 
     rest = rest_if_prefix("output_image: ", s);
@@ -145,7 +145,7 @@ string Camera::Encode() {
     osss << "camera_fwd:" << forward.x << forward.y << forward.z;
     osss << "camera_up:" << up.x << up.y << up.z;
     osss << "camera_fov_ha:" << half_vfov;
-    osss << "film_resolution:" << res[0] << res[1];
+    osss << "film_resolution:" << res.x << res.y;
     osss << "output_image: ";
 	oss << output_name;
     osss << "background:" << background_color.r << background_color.g << background_color.b;
@@ -269,56 +269,56 @@ void Load() {
 
         rest = rest_if_prefix("sphere: ", line);
         if (rest != "") {
-            Sphere* new_sphere = new Sphere();
+            Sphere* new_sphere = new Sphere(&entity_count, materials.back());
             new_sphere->Decode(rest);
             shapes.push_back(new_sphere);
         }
 
 		rest = rest_if_prefix("triangle: ", line);
         if (rest != "") {
-            Triangle* new_triangle = new Triangle();
+            Triangle* new_triangle = new Triangle(&entity_count, materials.back());
             new_triangle->Decode(rest);
             shapes.push_back(new_triangle);
         }
 
 		rest = rest_if_prefix("normal_triangle: ", line);
         if (rest != "") {
-            NormalTriangle* new_triangle = new NormalTriangle();
+            NormalTriangle* new_triangle = new NormalTriangle(&entity_count, materials.back());
             new_triangle->Decode(rest);
             shapes.push_back(new_triangle);
         }
 
         rest = rest_if_prefix("material: ", line);
         if (rest != "") {
-            Material* new_mat = new Material();
+            Material* new_mat = new Material(&entity_count);
             new_mat->Decode(rest);
             materials.push_back(new_mat);
         }
 
         rest = rest_if_prefix("ambient_light: ", line);
         if (rest != "") {
-            AmbientLight* new_light = new AmbientLight();
+            AmbientLight* new_light = new AmbientLight(&entity_count);
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("directional_light: ", line);
         if (rest != "") {
-            DirectionalLight* new_light = new DirectionalLight();
+            DirectionalLight* new_light = new DirectionalLight(&entity_count);
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("point_light: ", line);
         if (rest != "") {
-            PointLight* new_light = new PointLight();
+            PointLight* new_light = new PointLight(&entity_count);
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
 
         rest = rest_if_prefix("spot_light: ", line);
         if (rest != "") {
-            SpotLight* new_light = new SpotLight();
+            SpotLight* new_light = new SpotLight(&entity_count);
             new_light->Decode(rest);
             lights.push_back(new_light);
         }
@@ -356,4 +356,4 @@ void Save() {
 }
 
 
-}  // namespace P3
+}  // namespace Raytracer
