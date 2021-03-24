@@ -23,6 +23,13 @@ vector<string> debug_log{};
 ImVec2 disp_img_size{0.0, 0.0};
 GLuint disp_img_tex = -1;
 
+ImVec2 operator - (ImVec2& lhs, ImVec2& rhs) {
+    return ImVec2(lhs.x - rhs.x, lhs.y - rhs.y);
+}
+
+ImVec2 operator + (ImVec2& lhs, ImVec2& rhs) {
+    return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y);
+}
 
 vector<Geometry*>::iterator GetIter(Geometry* geo) {
     for (vector<Geometry*>::iterator it = shapes.begin(); it < shapes.end(); it++) {
@@ -444,9 +451,25 @@ int main(int argc, char** argv) {
         }
 
         if (disp_img_tex != -1) {
-            ImGui::Begin("Output");
-            ImGui::Image((void*)(intptr_t)disp_img_tex, disp_img_size);
-            ImGui::End();
+            if (false) {
+                ImGui::Begin("Output");
+                ImGui::Image((void*)disp_img_tex, disp_img_size);
+                ImGui::End();
+            }
+            else {
+                Log(to_string(disp_img_tex));
+                int w, h;
+                SDL_GetWindowSize(window, &w, &h);
+                ImVec2 window_center = ImVec2(w * 0.5f, h * 0.5f);
+                float vert = h / disp_img_size.y;
+                float hori = w / disp_img_size.x;
+                float scale = fmin(vert, hori);
+                ImVec2 half_size = ImVec2(disp_img_size.x * 0.5 * scale, disp_img_size.y * 0.5 * scale);
+                ImGui::GetBackgroundDrawList()->AddImage((void*)disp_img_tex, window_center - half_size, window_center + half_size);
+                if (!io.WantCaptureMouse) {
+
+                }
+            }
         }
 
 

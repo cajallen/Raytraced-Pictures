@@ -37,36 +37,7 @@ using namespace std::chrono;
 #define H_SPACING 4
 #define CHARARRAY_LEN 256
 
-// Readability
-#define X 0
-#define Y 1
-
-
 namespace Raytracer {
-
-struct Camera;
-
-// UI STATE
-extern int entity_count;
-extern Camera* camera;
-extern vector<Geometry*> shapes;
-extern vector<Material*> materials;
-extern vector<Light*> lights;
-extern vector<AmbientLight*> ambient_lights;
-extern char scene_name[CHARARRAY_LEN];
-extern char output_name[CHARARRAY_LEN];
-extern steady_clock::time_point last_request;
-extern vector<string> debug_log;
-
-extern ImVec2 disp_img_size;
-extern GLuint disp_img_tex;
-
-
-vector<Geometry*>::iterator GetIter(Geometry* geo);
-vector<Light*>::iterator GetIter(Light* light);
-void Delete(Geometry* geo);
-void Delete(Light* light);
-
 
 struct Camera : Object {
     vec3 position = vec3(0, 0, 0);
@@ -92,7 +63,29 @@ struct LoadState {
     vector<vec3> normals{};
 };
 
+// UI STATE
+extern int entity_count;
+extern Camera* camera;
+extern vector<Geometry*> shapes;
+extern vector<Material*> materials;
+extern vector<Light*> lights;
+extern vector<AmbientLight*> ambient_lights;
+extern char scene_name[CHARARRAY_LEN];
+extern char output_name[CHARARRAY_LEN];
+extern steady_clock::time_point last_request;
+extern vector<string> debug_log;
 extern LoadState load_state;
+
+extern ImVec2 disp_img_size;
+extern GLuint disp_img_tex;
+
+
+vector<Geometry*>::iterator GetIter(Geometry* geo);
+vector<Light*>::iterator GetIter(Light* light);
+void Delete(Geometry* geo);
+void Delete(Light* light);
+
+
 
 bool FindIntersection(vector<Geometry*> geometry, Ray ray, HitInformation* intersection);
 Color EvaluateRay(Ray ray);
